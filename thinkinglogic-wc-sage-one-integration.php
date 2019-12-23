@@ -16,8 +16,7 @@ if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly
 }
 
-require_once( dirname( __FILE__ ) . '/sageone_client.php');
-require_once( dirname( __FILE__ ) . '/sageone_signer.php');
+require_once( dirname( __FILE__ ) . '/sage_api_client.php');
 require_once( dirname( __FILE__ ) . '/class-thinking-logic-wc-sage.php');
 
 

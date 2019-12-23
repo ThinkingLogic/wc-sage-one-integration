@@ -27,15 +27,12 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
         const PRODUCT_FIELD_LEDGER_CODE     = '_tl_wc_sage_ledger_code';
         const ORDER_FIELD_CUSTOMER_ID       = '_tl_wc_sage_customer_id';
 
-        const TOKEN_ENDPOINT                = 'https://api.sageone.com/oauth2/token';
-        const BASE_ENDPOINT                 = 'https://api.sageone.com';
-        const AUTH_ENDPOINT                 = 'https://www.sageone.com/oauth2/auth/central';
+        const BASE_ENDPOINT                 = 'https://api.accounting.sage.com/v3.1/';
         const SAGEONE_UI_URL_BASE           = 'https://accounts-extra.sageone.com';
 
-        const SCOPE                         = 'full_access';
         const DATE_TIME_FORMAT              = 'd/m/Y H:i:s';
         const DATE_FORMAT                   = 'd/m/Y';
-        const APPLICATION_NAME              = 'themakershedbristol';
+        const APPLICATION_NAME              = 'Thinking Logic WooCommerce Sage Integration';
         const CREATE_INVOICE_BUTTON_ID      = 'tl_wc_sage_create_invoice';
 
         protected static $sageone_client = null;
@@ -57,9 +54,9 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
         }
 
         /**
-         * Creates and returns a singleton SageoneClient.
+         * Creates and returns a singleton SageApiClient.
          *
-         * @return     SageoneClient
+         * @return     SageApiClient
          */
         public static function sageClient() {
             if ( is_null( self::$sageone_client ) ) {
@@ -71,7 +68,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
                     update_option( self::OPTION_CALLBACK_URL, $callback_url );
                 }
 
-                self::$sageone_client = new SageoneClient($client_id, $client_secret, urlencode($callback_url), self::AUTH_ENDPOINT, self::TOKEN_ENDPOINT, self::SCOPE);
+                self::$sageone_client = new SageApiClient($client_id, $client_secret, urlencode($callback_url), self::SCOPE);
 
             }
             return self::$sageone_client;
@@ -251,7 +248,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
          */
         private function getLedgerCodeMap($refresh = false) {
             if ($refresh) {
-                $response = json_decode($this->makeGetRequest('/accounts/v1/ledger_accounts'));
+                $response = json_decode($this->makeGetRequest('/ledger_accounts'));
                 $map = array();
                 if ($response->{'$totalResults'}) {
                     $ledgers = (array) $response->{'$resources'};
@@ -273,7 +270,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
          * @return     string the response from sage, as a json string.
          */
         public function listCustomers($email = '') {
-            $url = '/accounts/v1/contacts?contact_type=1';
+            $url = '/contacts?contact_type=1';
             if ($email) {
                 $url .= '&email=' . $email;
             }
@@ -297,7 +294,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
          * @return     string the response from sage, as a json string.
          */
         public function listTaxRates() {
-            $response = $this->getData('/accounts/v1/tax_rates');
+            $response = $this->getData('/tax_rates');
             return $response;
         }
 
@@ -360,7 +357,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
             $params = apply_filters( ThinkingLogicWCSage::FILTER_CUSTOMER, $params, $order );
             self::log("createCustomer: after filter: ". json_encode($params));
 
-            $response = $this->postData('/accounts/v1/contacts', $params);
+            $response = $this->postData('/contacts', $params);
             return $response;
         }
 
@@ -426,7 +423,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
             $last = end($formatted_dates);
             $result = array();
 
-            $url = '/accounts/v1/sales_invoices?contact=' . $customer_id . '&from_date=' . $first . '&to_date=' . $last;
+            $url = '/sales_invoices?contact=' . $customer_id . '&from_date=' . $first . '&to_date=' . $last;
             $response = json_decode($this->getData($url));
             if ($response->{'$totalResults'} > 0) {
                 $result = $this->mapInvoicesByDate($response->{'$resources'}, $reference);
@@ -528,7 +525,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
             $params = apply_filters( ThinkingLogicWCSage::FILTER_INVOICE, $params, $order );
             self::log("createInvoice: after filter: ". json_encode($params));
 
-            $response = json_decode($this->postData('/accounts/v1/sales_invoices', $params));
+            $response = json_decode($this->postData('/sales_invoices', $params));
             return $response;
         }
 
@@ -574,7 +571,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
             self::refreshTokenIfNecessary();
             $url = self::BASE_ENDPOINT . $endpoint;
             $client = self::sageClient();
-            $headers = $this->getHeaders('post', $url, $params);
+            $headers = $this->getHeaders();
             $response = $client->postData($url, $params, $headers);
             return $response;
         }
@@ -589,33 +586,24 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
         private function getData($endpoint) {
             self::refreshTokenIfNecessary();
             $url = self::BASE_ENDPOINT . $endpoint;
-            $headers = $this->getHeaders('get', $url);
+            $headers = $this->getHeaders();
             $client = self::sageClient();
             $response = $client->getData($url, $headers);
             return $response;
         }
+
         /**
          * Constructs an array of headers for the given request.
          *
-         * @param      string  $url     The url
-         * @param      string  $method  The method
-         * @param      array   $params  The (optional) parameters
-         *
          * @return     array   The headers.
          */
-        private function getHeaders($method, $url, $params = array()) {
-            $nonce = bin2hex(openssl_random_pseudo_bytes(32));
-            $signing_secret = get_option(self::OPTION_SIGNING_SECRET);
+        private function getHeaders() {
             $token = get_option(self::OPTION_ACCESS_TOKEN);
-            $signature_object = new SageoneSigner($method, $url, $params, $nonce, $signing_secret, $token);
-            $signature = $signature_object->signature();
 
             $header = array("Accept: *.*",
                 "Content_Type: application/x-www-form-urlencoded",
                 "User-Agent: " . self::APPLICATION_NAME,
-                "Authorization: Bearer " . $token, 
-                "X-Signature: " . $signature, 
-                "X-Nonce: " . $nonce);
+                "Authorization: Bearer " . $token);
 
             return $header;
         }
