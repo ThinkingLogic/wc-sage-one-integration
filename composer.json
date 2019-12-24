@@ -1,5 +1,5 @@
 {
-    "name": "Tthinkinglogic/thinkinglogic-wc-sage-one-integration",
+    "name": "thinkinglogic/thinkinglogic-wc-sage-one-integration",
     "description": "An integration with the Sage One api (v3.1) for WooCommerce - allowing orders to be turned into Sage One invoices at the click of a button (per order).",
     "license": "MIT",
     "require": {
