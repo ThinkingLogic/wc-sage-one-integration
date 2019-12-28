@@ -9,32 +9,32 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
      * @class ThinkingLogicWCSage
      */
     class ThinkingLogicWCSage {
-        const OPTIONS_GROUP                 = 'tl-wc-sage-plugin-options';
-        const OPTION_CLIENT_ID              = 'tl_wc_sage_client_id';
-        const OPTION_CLIENT_SECRET          = 'tl_wc_sage_client_secret';
-        const OPTION_ACCESS_TOKEN           = 'tl_wc_sage_access_token';
-        const OPTION_ACCESS_TOKEN_EXPIRES   = 'tl_wc_sage_access_token_expires';
-	    const OPTION_REFRESH_TOKEN          = 'tl_wc_sage_refresh_token';
-	    const OPTION_REFRESH_TOKEN_EXPIRES  = 'tl_wc_sage_refresh_token_expires';
-	    const OPTION_CALLBACK_URL           = 'tl_wc_sage_callback_url';
-        const OPTION_CARRIAGE_TAX_ID        = 'tl_wc_sage_carriage_tax_id';
-        const OPTION_LINE_ITEM_TAX_ID       = 'tl_wc_sage_line_item_tax_id';
-        const OPTION_LEDGER_CODES           = 'tl_wc_sage_ledger_codes';
+        const OPTIONS_GROUP                    = 'tl-wc-sage-plugin-options';
+        const OPTION_CLIENT_ID                 = 'tl_wc_sage_client_id';
+        const OPTION_CLIENT_SECRET             = 'tl_wc_sage_client_secret';
+        const OPTION_ACCESS_TOKEN              = 'tl_wc_sage_access_token';
+        const OPTION_ACCESS_TOKEN_EXPIRES      = 'tl_wc_sage_access_token_expires';
+	    const OPTION_REFRESH_TOKEN             = 'tl_wc_sage_refresh_token';
+	    const OPTION_REFRESH_TOKEN_EXPIRES     = 'tl_wc_sage_refresh_token_expires';
+	    const OPTION_REFRESH_TOKEN_EXPIRES_AT  = 'tl_wc_sage_refresh_token_expires_at';
+	    const OPTION_CALLBACK_URL              = 'tl_wc_sage_callback_url';
+        const OPTION_CARRIAGE_TAX_ID           = 'tl_wc_sage_carriage_tax_id';
+        const OPTION_LINE_ITEM_TAX_ID          = 'tl_wc_sage_line_item_tax_id';
+        const OPTION_LEDGER_CODES              = 'tl_wc_sage_ledger_codes';
 
-        const FILTER_INVOICE_DATES          = 'tl_wc_sage_filter_invoice_dates';
-        const FILTER_CUSTOMER               = 'tl_wc_sage_filter_create_customer';
-        const FILTER_INVOICE                = 'tl_wc_sage_filter_create_invoice';
+        const FILTER_INVOICE_DATES             = 'tl_wc_sage_filter_invoice_dates';
+        const FILTER_CUSTOMER                  = 'tl_wc_sage_filter_create_customer';
+        const FILTER_INVOICE                   = 'tl_wc_sage_filter_create_invoice';
 
-        const PRODUCT_FIELD_LEDGER_CODE     = '_tl_wc_sage_ledger_code';
-        const ORDER_FIELD_CUSTOMER_ID       = '_tl_wc_sage_customer_id';
+        const PRODUCT_FIELD_LEDGER_CODE        = '_tl_wc_sage_ledger_code';
+        const ORDER_FIELD_CUSTOMER_ID          = '_tl_wc_sage_customer_id';
 
-        const BASE_ENDPOINT                 = 'https://api.accounting.sage.com/v3.1/';
-        const SAGEONE_UI_URL_BASE           = 'https://accounts-extra.sageone.com';
+        const SAGEONE_UI_URL_BASE              = 'https://accounts-extra.sageone.com';
 
-        const DATE_TIME_FORMAT              = 'd/m/Y H:i:s';
-        const DATE_FORMAT                   = 'd/m/Y';
-        const CREATE_INVOICE_BUTTON_ID      = 'tl_wc_sage_create_invoice';
-        const CALLBACK_REQUEST_PATH         = "/tl-wc-sage-plugin-callback";
+        const DATE_TIME_FORMAT                 = 'd/m/Y H:i:s';
+        const DATE_FORMAT                      = 'd/m/Y';
+        const CREATE_INVOICE_BUTTON_ID         = 'tl_wc_sage_create_invoice';
+        const CALLBACK_REQUEST_PATH            = "/tl-wc-sage-plugin-callback";
 
         protected static $sageone_client = null;
         protected static $_instance = null;
@@ -63,7 +63,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
                 $client_secret = get_option(self::OPTION_CLIENT_SECRET );
                 $callback_url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]" . self::CALLBACK_REQUEST_PATH;
 
-                self::$sageone_client = new SageApiClient($client_id, $client_secret, urlencode($callback_url));
+                self::$sageone_client = new SageApiClient($client_id, $client_secret, $callback_url);
             }
             return self::$sageone_client;
         }
@@ -202,8 +202,8 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
             if ($refresh) {
                 $response = json_decode($this->makeGetRequest('/ledger_accounts'));
                 $map = array();
-                if ($response->{'$totalResults'}) {
-                    $ledgers = (array) $response->{'$resources'};
+                if ($response->{'$total'}) {
+                    $ledgers = (array) $response->{'$items'};
                     foreach ($ledgers as $ledger) {
                         $map[strval($ledger->nominal_code)] = $ledger->id;
                     }
@@ -219,10 +219,10 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
          * Lists customers, optionally restricting the list to those with the given email address.
          *
          * @param      (optional) string  $email  The email address
-         * @return     string the response from sage, as a json string.
+         * @return     \SageAccounting\ApiResponse
          */
         public function listCustomers($email = '') {
-            $url = '/contacts?contact_type=1';
+            $url = '/contacts?contact_type_id=CUSTOMER';
             if ($email) {
                 $url .= '&email=' . $email;
             }
@@ -261,21 +261,22 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
             $custom = get_post_custom($order->get_id());
             $email = $order->get_billing_email();
 
-            $matches = json_decode($this->listCustomers($email));
-            if ($matches->{'$totalResults'} > 0) {
-                $customer = $matches->{'$resources'}[0];
-                if ($matches->{'$totalResults'} > 1) {
-                    $message = 'Found ' . $matches->{'$totalResults'} . ' SageOne customers with email address "' . $email . '", defaulting to the first match: #' . $customer->id;
+            $matches = $this->listCustomers($email)->getJSON();
+            if ($matches->{'$total'} > 0) {
+                $customer = $matches->{'$items'}[0];
+                if ($matches->{'$total'} > 1) {
+                    $message = 'Found ' . $matches->{'$total'} . ' SageOne customers with email address "' . $email . '", defaulting to the first match: #' . $customer->id;
                     self::addAdminWarning( $message );
                     $order->add_order_note( $message );
                 } else {
                     self::addAdminNotice("Found existing SageOne customer #" . $customer->id);
                 }
             } else {
-                $first_name = $order->get_billing_first_name();
-                $last_name = $order->get_billing_last_name();
-                $phone = $order->get_billing_phone();
-                $customer = json_decode( $this->createCustomer($email, $first_name . ' ' . $last_name, $phone, $order) );
+                $first_name   = $order->get_billing_first_name();
+                $last_name    = $order->get_billing_last_name();
+                $phone        = $order->get_billing_phone();
+	            $api_response = $this->createCustomer( $email, $first_name . ' ' . $last_name, $phone, $order );
+	            $customer     = $api_response->getJSON();
                 self::addAdminNotice( "Created SageOne customer #" . $customer->id );
                 $order->add_order_note( "Created SageOne customer #" . $customer->id );
             }
@@ -295,7 +296,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
          * @param      string    $phone     The phone
          * @param      WC_Order  $order     The order
          *
-         * @return     string  the customer in json format
+         * @return     \SageAccounting\ApiResponse
          */
         private function createCustomer($email, $name, $phone, $order) {
 	        $contact = array();
@@ -309,8 +310,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 	        $contact = apply_filters( ThinkingLogicWCSage::FILTER_CUSTOMER, $contact, $order );
             self::log("createCustomer: after filter: ". json_encode($contact));
 
-            $response = $this->postData('/contacts', ['contact' => $contact]);
-            return $response;
+	        return $this->postData('/contacts', [ 'contact' => $contact]);
         }
 
         /**
@@ -353,16 +353,16 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
             return $this->getPaypalOrderPrefix() . $order->get_id();
         }
 
-        /**
-         * List all invoices matching the given customer id and reference, within the range of dates given.
-         * See https://developers.sageone.com/docs/en/v1#sales_invoices-list_all_invoices.
-         *
-         * @param      string  $customer_id  The customer identifier
-         * @param      string  $reference    The reference - e.g. order id
-         * @param      array   $the dates in which we're interested
-         *
-         * @return     array   existing invoices as returned by Sage, keyed by the invoice date.
-         */
+	    /**
+	     * List all invoices matching the given customer id and reference, within the range of dates given.
+	     * See https://developers.sageone.com/docs/en/v1#sales_invoices-list_all_invoices.
+	     *
+	     * @param string $customer_id The customer identifier
+	     * @param string $reference The reference - e.g. order id
+	     * @param $dates
+	     *
+	     * @return     array   existing invoices as returned by Sage, keyed by the invoice date.
+	     */
         private function listInvoices($customer_id, $reference, $dates) {
             // sort the invoice dates to get the first and last date
             $formatted_dates = array();
@@ -375,10 +375,10 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
             $last = end($formatted_dates);
             $result = array();
 
-            $url = '/sales_invoices?contact=' . $customer_id . '&from_date=' . $first . '&to_date=' . $last;
-            $response = json_decode($this->getData($url));
-            if ($response->{'$totalResults'} > 0) {
-                $result = $this->mapInvoicesByDate($response->{'$resources'}, $reference);
+            $url = '/sales_invoices?contact_id=' . $customer_id . '&from_date=' . $first . '&to_date=' . $last . '&items_per_page=200';
+            $response = $this->getData($url)->getJSON();
+            if ($response->{'$total'} > 0) {
+                $result = $this->mapInvoicesByDate($response->{'$items'}, $reference);
             }
             return $result;
         }
@@ -497,27 +497,24 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
          * @param      string  $endpoint  The endpoint, the portion after the BASE_ENDPOINT
          * @param      string  $postData  Object representing the body of the post request
          *
-         * @return     string  The response from SageOne.
+         * @return     \SageAccounting\ApiResponse
          */
         private function postData($endpoint, $postData) {
-            $url = self::BASE_ENDPOINT . $endpoint;
-            $client = self::sageClient();
+	        $client = self::sageClient();
 
-	        return $client->execApiRequest( $url, 'POST', json_encode($postData) );
+	        return $client->execApiRequest( $endpoint, 'POST', json_encode($postData) );
         }
 
         /**
          * Makes a get request to SageOne, refreshing the token if necessary and generating all required headers.
          *
-         * @param      string  $url      The url
-         *
-         * @return     string  The response from SageOne.
+         * @param      string  $endpoint  The endpoint, the portion after the BASE_ENDPOINT
+         * @return     \SageAccounting\ApiResponse
          */
         private function getData($endpoint) {
-            $url = self::BASE_ENDPOINT . $endpoint;
             $client = self::sageClient();
 
-	        return $client->execApiRequest( $url, 'GET' );
+	        return $client->execApiRequest( $endpoint, 'GET' );
         }
 
 	    /**

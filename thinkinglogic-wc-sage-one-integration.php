@@ -76,6 +76,7 @@ function tl_wc_sage_register_settings() { // whitelist options
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_CLIENT_SECRET );
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_REFRESH_TOKEN );
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES );
+	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES_AT );
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_ACCESS_TOKEN );
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES );
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_CALLBACK_URL );
@@ -89,17 +90,21 @@ function tl_wc_sage_register_settings() { // whitelist options
  * @param integer $order_id The order identifier
  */
 function tl_wc_sage_order_actions( $order_id ) {
-	//$sage = ThinkingLogicWCSage::instance();
 	$order = wc_get_order( $order_id );
 	if ( 'processing' == $order->get_status() ) {
-		?>
-        <li class="wide">
-            <div id="tl_wc_sage_order_actions" style="text-align: center;"><input type="submit"
-                                                                                  class="button button-primary tl_wc_sage_order"
-                                                                                  name="<?php echo ThinkingLogicWCSage::CREATE_INVOICE_BUTTON_ID ?>"
-                                                                                  value="Create Sage Invoice(s)"/></div>
-        </li>
-		<?php
+		$sage = ThinkingLogicWCSage::sageClient();
+		echo '<li class="wide">';
+		echo '   <div id="tl_wc_sage_order_actions" style="text-align: center;">';
+		if ($sage->isRefreshTokenExpiringSoon()) {
+			echo '<a class="button" href="' . $sage->authorizationEndpoint() .'">Refresh Authorisation for Sage</a>';
+        } else {
+            echo '       <input type="submit"';
+            echo '           class="button button-primary tl_wc_sage_order"';
+            echo '           name="' . ThinkingLogicWCSage::CREATE_INVOICE_BUTTON_ID . '"';
+            echo '           value="Create Sage Invoice(s)"/>';
+        }
+		echo '   </div>';
+		echo '</li>';
 	}
 
 }

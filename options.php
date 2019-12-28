@@ -2,23 +2,27 @@
 
 $sageone_client = false;
 $response = false;
+$client = false;
 
 if (ThinkingLogicWCSage::hasClientDetails()) {
+	$client = ThinkingLogicWCSage::instance();
 	$sageone_client = ThinkingLogicWCSage::sageClient();
-    $test_client = $_GET['test_client'];
-    $list_tax_rates = $_GET['list_tax_rates'];
-    $test_endpoint = $_GET['test_endpoint'];
-    if ($test_client) {
-        $client = ThinkingLogicWCSage::instance();
+	$test_client = $_GET['test_client'];
+	$list_tax_rates = $_GET['list_tax_rates'];
+	$list_contact_types = $_GET['list_contact_types'];
+	$test_endpoint = $_GET['test_endpoint'];
+	if ($test_client) {
         $response = $client->listCustomers();
     } elseif ($list_tax_rates) {
-        $client = ThinkingLogicWCSage::instance();
         $response = $client->listTaxRates();
+    } elseif ($list_contact_types) {
+		$response = $client->makeGetRequest('/contact_types');
     } elseif ($test_endpoint) {
-        $client = ThinkingLogicWCSage::instance();
         $response = $client->makeGetRequest($test_endpoint);
     }
 }
+
+$refreshTokenExpires = get_option( ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES );
 
 ?>
 <div class="wrap">
@@ -26,8 +30,14 @@ if (ThinkingLogicWCSage::hasClientDetails()) {
 <form method="post" action="options.php"> 
     <?php settings_fields(      ThinkingLogicWCSage::OPTIONS_GROUP ); ?>
     <?php do_settings_sections( ThinkingLogicWCSage::OPTIONS_GROUP ); ?>
-    <p>You will need to register this as an application with <a href="https://developers.sageone.com/applications/">developers.sageone.com</a> (requires a github login) - once registered it will provide you with the Client ID, Client Secret and Signing Secret to enter below. You can use the url of this page as the callback url.</p>
-    <p>The Subscription Key can be found in the <a href="https://developer.columbus.sage.com/developer">Sage developer profile</a>.</p>
+    <?php
+        if (isset($client) && $sageone_client->isRefreshTokenExpiringSoon() ) {
+            echo '<p><strong>Your Refresh Token expires soon - you should:<br/>';
+	        echo '<a class="button" href="' . $sageone_client->authorizationEndpoint() .'">Refresh Authorisation</a>';
+	        echo '</strong></p><hr/>';
+        }
+    ?>
+    <p>You should have registered this as an application with <a href="https://developers.sageone.com/applications/">developers.sageone.com</a> (requires a github login) - once registered it will provide you with the Client ID and Client Secret to enter below.</p>
     <table class="form-table">
         <tr valign="top">
         <th scope="row">Client ID</th>
@@ -62,7 +72,7 @@ if (ThinkingLogicWCSage::hasClientDetails()) {
 
             <tr valign="top">
             <th scope="row">Expires at</th>
-            <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ) ); ?>" /> (Time now: <?php $now=new DateTime(); echo $now->format(ThinkingLogicWCSage::DATE_TIME_FORMAT); ?>)</td>
+            <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ) ); ?>" /> (<?php echo gmdate(ThinkingLogicWCSage::DATE_TIME_FORMAT, get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES )); ?>, Time now: <?php $now=new DateTime(); echo $now->format(ThinkingLogicWCSage::DATE_TIME_FORMAT); ?>)</td>
             </tr>
 
             <tr valign="top">
@@ -71,19 +81,24 @@ if (ThinkingLogicWCSage::hasClientDetails()) {
             </tr>
 
             <tr valign="top">
-                <th scope="row">Refresh Token Expires at</th>
-                <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES ) ); ?>" /></td>
+                <th scope="row">Refresh Token Expires in (seconds)</th>
+                <td>
+                    <input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES ?>" value="<?php echo esc_attr( $refreshTokenExpires ); ?>" />
+                    (<?php echo number_format ( $refreshTokenExpires / ( 60 * 60) ); ?> hours
+                    = <?php echo number_format ( $refreshTokenExpires / ( 60 * 60 * 24) ); ?> days)
+                </td>
             </tr>
 
         <?php } ?>
         <?php 
         $access_token = get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN );
         if($access_token) { 
-            $test_url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]" . "&test_client=";
+            $test_url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
             ?>
             <tr valign="top">
             <th scope="row"></th>
-            <td><a class="button" href="<?php echo $test_url ?>true">Test Sage connection by listing customers</a>
+            <td><a class="button" href="<?php echo $test_url ?>&test_client=true">Test Sage connection by listing customers</a>
+                <a class="button" href="<?php echo $test_url ?>&list_contact_types=true">List contact types</a>
             </td>
             </tr>
             <tr valign="top">
@@ -100,7 +115,7 @@ if (ThinkingLogicWCSage::hasClientDetails()) {
         <?php if($response) { ?>
             <tr valign="top">
             <th scope="row">Response from Sage</th>
-            <td><pre><?php $json = json_decode($response); $pretty_json = json_encode($json, JSON_PRETTY_PRINT); echo $pretty_json; ?></pre>
+            <td><pre><?php $pretty_json = json_encode($response->getJSON(), JSON_PRETTY_PRINT); echo $pretty_json; ?></pre>
             </td>
             </tr>
 

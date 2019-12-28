@@ -1,6 +1,7 @@
 <?php
 namespace ThinkingLogic;
 
+use League\OAuth2\Client\Token\AccessTokenInterface;
 use ThinkingLogicWCSage;
 
 require __DIR__ . '/vendor/autoload.php';
@@ -22,7 +23,7 @@ class SageApiClient {
 	private $accessTokenStore;
 	private $generatedState;
 
-	const BASE_ENDPOINT = "https://api.accounting.sage.com/v3.1/";
+	const BASE_ENDPOINT = "https://api.accounting.sage.com/v3.1";
 	const AUTH_ENDPOINT = "https://www.sageone.com/oauth2/auth/central?filter=apiv3.1";
 	const TOKEN_ENDPOINT = "https://oauth.accounting.sage.com/token";
 	const SCOPE = "full_access";
@@ -56,7 +57,7 @@ class SageApiClient {
 	 */
 	public function authorizationEndpoint() {
 		return self::AUTH_ENDPOINT . "&response_type=code&client_id=" .
-		       $this->clientId . "&redirect_uri=" . $this->callbackUrl .
+		       $this->clientId . "&redirect_uri=" . urlencode($this->callbackUrl) .
 		       "&scope=" . self::SCOPE . "&state=" . $this->generatedState;
 	}
 
@@ -64,7 +65,7 @@ class SageApiClient {
 	public function getInitialAccessToken( $code, $receivedState ) {
 		$initialAccessToken = null;
 		try {
-			self::log("About to getInitialAccessToken");
+			self::log("About to getInitialAccessToken using clientId=" . $this->clientId . ", clientSecret=" . $this->clientSecret . ", callbackUrl=" . $this->callbackUrl);
 			$initialAccessToken = $this->oauthClient->getAccessToken( 'authorization_code', [ 'code' => $code ] );
 			return $this->storeAccessToken( $initialAccessToken );
 		} catch ( \League\OAuth2\Client\Grant\Exception\InvalidGrantException $e ) {
@@ -93,7 +94,6 @@ class SageApiClient {
 
 	/* POST request to renew the access_token */
 	public function renewAccessToken() {
-		self::log("renewAccessToken");
 		$newAccessToken = null;
 		try {
 			$newAccessToken = $this->oauthClient->getAccessToken( 'refresh_token', [ 'refresh_token' => $this->getRefreshToken() ] );
@@ -111,9 +111,10 @@ class SageApiClient {
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
 		} catch ( \Exception $e ) {
 			// general exception
-			self::log("Unable to getInitialAccessToken - Exception: " . $e . ", message: " . $e->getMessage());
+			self::log("Unable to getInitialAccessToken - message: " . $e->getMessage());
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
 		} finally {
+			self::log("renewAccessToken: " . json_encode($newAccessToken));
 			return $this->storeAccessToken( $newAccessToken );
 		}
 	}
@@ -130,7 +131,15 @@ class SageApiClient {
 			self::log("Cannot renew token - no expires value found");
 		}
 	}
-	/* GET request */
+
+
+	/**
+	 * @param $resource
+	 * @param $httpMethod
+	 * @param null $postData
+	 *
+	 * @return \SageAccounting\ApiResponse
+	 */
 	public function execApiRequest( $resource, $httpMethod, $postData = null ) {
 		$this->refreshTokenIfNecessary();
 		$method = strtoupper( $httpMethod );
@@ -147,50 +156,67 @@ class SageApiClient {
 			$requestResponse = $this->oauthClient->getResponse( $request );
 
 		} catch ( \League\OAuth2\Client\Provider\Exception\IdentityProviderException $e ) {
-			self::log("Caught IdentityProviderException making " . $httpMethod . " request to " . $resource);
+			self::log("Caught IdentityProviderException making " . $httpMethod . " request to " . $resource . ": " . $e->getMessage());
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
 		} catch ( \GuzzleHttp\Exception\ClientException $e ) {
 			// catch all 4xx errors
-			self::log("Caught ClientException making " . $httpMethod . " request to " . $resource);
+			self::log("Caught ClientException making " . $httpMethod . " request to " . $resource . ": " . $e->getMessage());
 			$requestResponse = $e->getResponse();
 		} catch ( \GuzzleHttp\Exception\ServerException $e ) {
 			// catch all 5xx errors
-			self::log("Caught ServerException making " . $httpMethod . " request to " . $resource);
+			self::log("Caught ServerException making " . $httpMethod . " request to " . $resource . ": " . $e->getMessage());
 			$requestResponse = $e->getResponse();
 		} catch ( \GuzzleHttp\Exception\ConnectException $e ) {
 			// if no internet connection is available
-			self::log("Caught ConnectException making " . $httpMethod . " request to " . $resource);
+			self::log("Caught ConnectException making " . $httpMethod . " request to " . $resource . ": " . $e->getMessage());
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
 		} catch ( Exception $e ) {
 			// general exception
-			self::log("Caught Exception making " . $httpMethod . " request to " . $resource);
+			self::log("Caught Exception making " . $httpMethod . " request to " . $resource . ": " . $e->getMessage());
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
 		} finally {
 			$endTime = microtime( 1 );
-			self::log("Made " . $httpMethod . " request to " . $resource . ", response: " . $requestResponse );
-			return new \SageAccounting\ApiResponse( $requestResponse, $endTime - $startTime );
+			$api_response = new \SageAccounting\ApiResponse( $requestResponse, $endTime - $startTime );
+			self::log("Made " . $httpMethod . " request to " . $resource . ", response: " . $api_response->getBody() );
+
+			return $api_response;
 		}
 	}
 
 	/**
-	 * Returns the previously loaded access token
+	 * Returns the access token
 	 */
 	public function getAccessToken() {
 		return $this->getAccessTokenStore()->getAccessToken();
 	}
 
 	/**
-	 * Returns the previously loaded UNIX timestamp when the access token expires
+	 * Returns the UNIX timestamp when the access token expires
 	 */
 	public function getExpiresAt() {
 		return $this->getAccessTokenStore()->getExpiresAt();
 	}
 
 	/**
-	 * Returns the previously loaded refresh token
+	 * Returns the refresh token
 	 */
 	public function getRefreshToken() {
 		return $this->getAccessTokenStore()->getRefreshToken();
+	}
+
+	/**
+	 * Returns the UNIX timestamp when the refresh token expires
+	 */
+	public function getRefreshTokenExpiresAt() {
+		return $this->getAccessTokenStore()->getRefreshTokenExpiresAt();
+	}
+
+	/**
+	 * @return true if the refresh token will expire within the next hour
+	 */
+	public function isRefreshTokenExpiringSoon() {
+		$expires_at = $this->getRefreshTokenExpiresAt();
+		return empty($expires_at) || $expires_at < ( time() + ( 60 * 60) );
 	}
 
 	public function getAccessTokenStore() {
@@ -198,7 +224,7 @@ class SageApiClient {
 			return $this->accessTokenStore;
 		}
 
-		$this->accessTokenStore = new \SageAccounting\AccessTokenStore();
+		$this->accessTokenStore = new AccessTokenStore();
 		if ( ! $this->accessTokenStore->load() ) {
 			$this->accessTokenStore = null;
 		}
@@ -208,7 +234,7 @@ class SageApiClient {
 
 	// Private area
 
-	private function storeAccessToken( $response ) {
+	private function storeAccessToken( AccessTokenInterface $response ) {
 		if ( ! $this->accessTokenStore ) {
 			$this->accessTokenStore = new AccessTokenStore();
 		}
@@ -220,6 +246,7 @@ class SageApiClient {
 			$response->getValues()["refresh_token_expires_in"]
 		);
 
+		self::log("Stored access token as " . substr($response->getToken(), 0, 5) . "...");
 		return $response;
 	}
 

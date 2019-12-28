@@ -8,7 +8,7 @@ class AccessTokenStore {
 	private $accessToken;
 	private $expiresAt;
 	private $refreshToken;
-	private $refreshTokenExpiresAt;
+	private $refreshTokenExpiresIn;
 
 	/**
 	 * Returns the previously loaded access token
@@ -35,15 +35,20 @@ class AccessTokenStore {
 	}
 
 	/**
-	 * Returns the previously loaded UNIX timestamp when the refresh token expires
+	 * Returns the UNIX timestamp when the refresh token expires
 	 */
 	public function getRefreshTokenExpiresAt()
 	{
-		return $this->refreshTokenExpiresAt;
+		return get_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES_AT);
 	}
 
 	/**
-	 * Writes the data to the YAML file. Returns TRUE on success, otherwise FALSE
+	 * Updates the access token details, storing them using update_option.
+	 *
+	 * @param $accessToken
+	 * @param $expiresAt
+	 * @param $refreshToken
+	 * @param $refreshTokenExpiresIn
 	 */
 	public function save($accessToken, $expiresAt, $refreshToken, $refreshTokenExpiresIn)
 	{
@@ -51,18 +56,22 @@ class AccessTokenStore {
 		update_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES, $expiresAt);
 		update_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN, $refreshToken);
 		update_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES, $refreshTokenExpiresIn);
+		update_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES_AT, time() + $refreshTokenExpiresIn);
+		$this->accessToken           = $accessToken;
+		$this->expiresAt             = $expiresAt;
+		$this->refreshToken          = $refreshToken;
+		$this->refreshTokenExpiresIn = $refreshTokenExpiresIn;
 	}
 
 	/**
-	 * Loads the data from the YAML file. Returns TRUE on success, otherwise FALSE
+	 * Loads the data from WP using get_option. Returns true.
 	 */
 	public function load()
 	{
-
-		$this->accessToken = get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN);
-		$this->expiresAt = get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES);
-		$this->refreshToken = get_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN);
-		$this->refreshTokenExpiresAt = get_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES);
+		$this->accessToken           = get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN);
+		$this->expiresAt             = get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES);
+		$this->refreshToken          = get_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN);
+		$this->refreshTokenExpiresIn = get_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES);
 
 		return true;
 	}
