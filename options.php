@@ -4,20 +4,11 @@ $sageone_client = false;
 $response = false;
 
 if (ThinkingLogicWCSage::hasClientDetails()) {
-    $sageone_client = ThinkingLogicWCSage::sageClient();
-    $authorisation_code = $_GET['code'];
+	$sageone_client = ThinkingLogicWCSage::sageClient();
     $test_client = $_GET['test_client'];
     $list_tax_rates = $_GET['list_tax_rates'];
     $test_endpoint = $_GET['test_endpoint'];
-    if ($authorisation_code) {
-        ThinkingLogicWCSage::log("Got authorisation code : " . $authorisation_code);
-        /* Exchange the authorisation code for an access_token */
-        $response = $sageone_client->getAccessToken($authorisation_code);
-        ThinkingLogicWCSage::log("Got response from Sage: " . $response);
-        if ($response) {
-            ThinkingLogicWCSage::saveTokensFromResponse($response);
-        }
-    } elseif ($test_client) {
+    if ($test_client) {
         $client = ThinkingLogicWCSage::instance();
         $response = $client->listCustomers();
     } elseif ($list_tax_rates) {
@@ -47,17 +38,7 @@ if (ThinkingLogicWCSage::hasClientDetails()) {
         <th scope="row">Client Secret</th>
         <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_CLIENT_SECRET ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_CLIENT_SECRET ) ); ?>" /></td>
         </tr>
-        
-        <tr valign="top">
-        <th scope="row">Signing Secret</th>
-        <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_SIGNING_SECRET ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_SIGNING_SECRET ) ); ?>" /></td>
-        </tr>
-        
-        <tr valign="top">
-        <th scope="row">Subscription Key</th>
-        <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_SUBSCRIPTION_KEY ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_SUBSCRIPTION_KEY ) ); ?>" /></td>
-        </tr>
-        
+
         <?php if($sageone_client) { ?>
             <tr valign="top">
             <th scope="row">Carriage Tax Rate id</th>
@@ -72,25 +53,26 @@ if (ThinkingLogicWCSage::hasClientDetails()) {
             </tr>
 
             <tr valign="top">
-            <th scope="row">Refresh Token</th>
-            <td>To obtain a refresh token and an access token, you must authenticate with Sage One and authorise this app by clicking <a href="<?php echo $sageone_client->authRedirect() ?>">here</a>.
-                <br/>
-                <input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_REFRESH_TOKEN ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN ) ); ?>" /></td>
-            </tr>
-
-            <tr valign="top">
-            <th scope="row">Callback url</th>
-            <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_CALLBACK_URL ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_CALLBACK_URL ) ); ?>" /></td>
-            </tr>
-
-            <tr valign="top">
             <th scope="row">Access Token</th>
-            <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_ACCESS_TOKEN ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN ) ); ?>" /></td>
+                <td>To obtain a refresh token and an access token, you must authenticate with Sage One and authorise this app by clicking <a href="<?php echo $sageone_client->authorizationEndpoint() ?>">here</a>.
+                    <br/>
+                    <input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_ACCESS_TOKEN ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN ) ); ?>" />
+                </td>
             </tr>
 
             <tr valign="top">
             <th scope="row">Expires at</th>
             <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ) ); ?>" /> (Time now: <?php $now=new DateTime(); echo $now->format(ThinkingLogicWCSage::DATE_TIME_FORMAT); ?>)</td>
+            </tr>
+
+            <tr valign="top">
+                <th scope="row">Refresh Token</th>
+                <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_REFRESH_TOKEN ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN ) ); ?>" /></td>
+            </tr>
+
+            <tr valign="top">
+                <th scope="row">Refresh Token Expires at</th>
+                <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES ) ); ?>" /></td>
             </tr>
 
         <?php } ?>

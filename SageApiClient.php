@@ -1,7 +1,10 @@
 <?php
+namespace ThinkingLogic;
+
+use ThinkingLogicWCSage;
 
 require __DIR__ . '/vendor/autoload.php';
-include 'sage/access_token_store.php';
+require __DIR__ . '/AccessTokenStore.php';
 include 'sage/api_response.php';
 
 /**
@@ -16,7 +19,6 @@ class SageApiClient {
 	private $clientSecret;
 	private $callbackUrl;
 	private $oauthClient;
-	private $scope;
 	private $accessTokenStore;
 	private $generatedState;
 
@@ -31,13 +33,11 @@ class SageApiClient {
 	 * @param string $client_id Your application's client_id
 	 * @param string $client_secret Your application's client_secret
 	 * @param string $callback_url Your application's callback_url
-	 * @param string $scope The type of access - readonly or full_access
 	 */
-	public function __construct( $client_id, $client_secret, $callback_url, $scope ) {
+	public function __construct( $client_id, $client_secret, $callback_url ) {
 		$this->clientId     = $client_id;
 		$this->clientSecret = $client_secret;
 		$this->callbackUrl  = $callback_url;
-		$this->scope        = $scope;
 		$this->generateRandomState();
 		$this->oauthClient = new \League\OAuth2\Client\Provider\GenericProvider( [
 			'clientId'                => $this->clientId,
@@ -62,46 +62,78 @@ class SageApiClient {
 
 	/* POST request to exchange the authorization code for an access_token */
 	public function getInitialAccessToken( $code, $receivedState ) {
+		$initialAccessToken = null;
 		try {
+			self::log("About to getInitialAccessToken");
 			$initialAccessToken = $this->oauthClient->getAccessToken( 'authorization_code', [ 'code' => $code ] );
+			return $this->storeAccessToken( $initialAccessToken );
 		} catch ( \League\OAuth2\Client\Grant\Exception\InvalidGrantException $e ) {
 			// authorization code was not found or is invalid
+			self::log("Unable to getInitialAccessToken - InvalidGrantException: " . $e->getMessage());
+			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
+		} catch ( \League\OAuth2\Client\Provider\Exception\IdentityProviderException $e ) {
+			// authorization code was not found or is invalid
+			self::log("Unable to getInitialAccessToken - IdentityProviderException: " . $e);
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
 		} catch ( \GuzzleHttp\Exception\ConnectException $e ) {
 			// if no internet connection is available
+			self::log("Unable to getInitialAccessToken - ConnectException: " . $e->getMessage());
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
-		} catch ( UnexpectedValueException $e ) {
+		} catch ( \UnexpectedValueException $e ) {
 			// An OAuth server error was encountered that did not contain a JSON body
+			self::log("Unable to getInitialAccessToken - UnexpectedValueException: " . $e->getMessage());
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
-		} catch ( Exception $e ) {
+		} catch ( \Exception $e ) {
 			// general exception
+			self::log("Unable to getInitialAccessToken - Exception: " . $e . ", message: " . $e->getMessage());
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
-		} finally {
-			return $this->storeAccessToken( $initialAccessToken );
 		}
+		return $initialAccessToken;
 	}
 
 	/* POST request to renew the access_token */
 	public function renewAccessToken() {
+		self::log("renewAccessToken");
+		$newAccessToken = null;
 		try {
 			$newAccessToken = $this->oauthClient->getAccessToken( 'refresh_token', [ 'refresh_token' => $this->getRefreshToken() ] );
 		} catch ( \League\OAuth2\Client\Grant\Exception\InvalidGrantException $e ) {
 			// refresh token was not found or is invalid
+			self::log("Unable to renewAccessToken - InvalidGrantException: " . $e->getMessage());
+			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
+		} catch ( \League\OAuth2\Client\Provider\Exception\IdentityProviderException $e ) {
+			// refresh token was not found or is invalid
+			self::log("Unable to renewAccessToken - IdentityProviderException: " . $e->getMessage());
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
 		} catch ( \GuzzleHttp\Exception\ConnectException $e ) {
 			// if no internet connection is available
+			self::log("Unable to renewAccessToken - ConnectException: " . $e->getMessage());
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
-		} catch ( Exception $e ) {
+		} catch ( \Exception $e ) {
 			// general exception
+			self::log("Unable to getInitialAccessToken - Exception: " . $e . ", message: " . $e->getMessage());
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
 		} finally {
 			return $this->storeAccessToken( $newAccessToken );
 		}
 	}
 
+	public function refreshTokenIfNecessary() {
+		$expires = $this->getExpiresAt();
+		if ($expires) {
+			if (time() >= $expires) {
+				$this->renewAccessToken();
+			} else {
+				self::log("token does not require refreshing");
+			}
+		} else {
+			self::log("Cannot renew token - no expires value found");
+		}
+	}
 	/* GET request */
 	public function execApiRequest( $resource, $httpMethod, $postData = null ) {
-		$method                             = strtoupper( $httpMethod );
+		$this->refreshTokenIfNecessary();
+		$method = strtoupper( $httpMethod );
 		$options['headers']['Content-Type'] = 'application/json';
 
 		if ( $postData && ( $method == 'POST' || $method == 'PUT' ) ) {
@@ -115,22 +147,27 @@ class SageApiClient {
 			$requestResponse = $this->oauthClient->getResponse( $request );
 
 		} catch ( \League\OAuth2\Client\Provider\Exception\IdentityProviderException $e ) {
+			self::log("Caught IdentityProviderException making " . $httpMethod . " request to " . $resource);
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
 		} catch ( \GuzzleHttp\Exception\ClientException $e ) {
 			// catch all 4xx errors
+			self::log("Caught ClientException making " . $httpMethod . " request to " . $resource);
 			$requestResponse = $e->getResponse();
 		} catch ( \GuzzleHttp\Exception\ServerException $e ) {
 			// catch all 5xx errors
+			self::log("Caught ServerException making " . $httpMethod . " request to " . $resource);
 			$requestResponse = $e->getResponse();
 		} catch ( \GuzzleHttp\Exception\ConnectException $e ) {
 			// if no internet connection is available
+			self::log("Caught ConnectException making " . $httpMethod . " request to " . $resource);
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
 		} catch ( Exception $e ) {
 			// general exception
+			self::log("Caught Exception making " . $httpMethod . " request to " . $resource);
 			ThinkingLogicWCSage::addAdminWarning( $e->getMessage() );
 		} finally {
 			$endTime = microtime( 1 );
-
+			self::log("Made " . $httpMethod . " request to " . $resource . ", response: " . $requestResponse );
 			return new \SageAccounting\ApiResponse( $requestResponse, $endTime - $startTime );
 		}
 	}
@@ -173,7 +210,7 @@ class SageApiClient {
 
 	private function storeAccessToken( $response ) {
 		if ( ! $this->accessTokenStore ) {
-			$this->accessTokenStore = new \SageAccounting\AccessTokenStore();
+			$this->accessTokenStore = new AccessTokenStore();
 		}
 
 		$this->accessTokenStore->save(
@@ -197,4 +234,17 @@ class SageApiClient {
 		}
 		$this->generatedState = $randomString;
 	}
+
+
+	/**
+	 * Logs a message to the error log, if both WP_DEBUG and WP_DEBUG_LOG are true.
+	 *
+	 * @param      string  $message  The message
+	 */
+	private static function log($message) {
+		if (constant('WP_DEBUG') && constant('WP_DEBUG_LOG')) {
+			error_log("ThinkingLogicWCSage: " . $message);
+		}
+	}
+
 }

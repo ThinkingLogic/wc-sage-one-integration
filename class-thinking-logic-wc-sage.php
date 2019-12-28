@@ -1,5 +1,7 @@
 <?php
 
+use ThinkingLogic\SageApiClient;
+
 if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
     /**
      * Main Class.
@@ -10,12 +12,11 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
         const OPTIONS_GROUP                 = 'tl-wc-sage-plugin-options';
         const OPTION_CLIENT_ID              = 'tl_wc_sage_client_id';
         const OPTION_CLIENT_SECRET          = 'tl_wc_sage_client_secret';
-        const OPTION_SIGNING_SECRET         = 'tl_wc_sage_signing_secret';
-        const OPTION_SUBSCRIPTION_KEY       = 'tl_wc_sage_apim_subscription_key';
         const OPTION_ACCESS_TOKEN           = 'tl_wc_sage_access_token';
         const OPTION_ACCESS_TOKEN_EXPIRES   = 'tl_wc_sage_access_token_expires';
-        const OPTION_REFRESH_TOKEN          = 'tl_wc_sage_refresh_token';
-        const OPTION_CALLBACK_URL           = 'tl_wc_sage_callback_url';
+	    const OPTION_REFRESH_TOKEN          = 'tl_wc_sage_refresh_token';
+	    const OPTION_REFRESH_TOKEN_EXPIRES  = 'tl_wc_sage_refresh_token_expires';
+	    const OPTION_CALLBACK_URL           = 'tl_wc_sage_callback_url';
         const OPTION_CARRIAGE_TAX_ID        = 'tl_wc_sage_carriage_tax_id';
         const OPTION_LINE_ITEM_TAX_ID       = 'tl_wc_sage_line_item_tax_id';
         const OPTION_LEDGER_CODES           = 'tl_wc_sage_ledger_codes';
@@ -32,14 +33,12 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 
         const DATE_TIME_FORMAT              = 'd/m/Y H:i:s';
         const DATE_FORMAT                   = 'd/m/Y';
-        const APPLICATION_NAME              = 'Thinking Logic WooCommerce Sage Integration';
         const CREATE_INVOICE_BUTTON_ID      = 'tl_wc_sage_create_invoice';
+        const CALLBACK_REQUEST_PATH         = "/tl-wc-sage-plugin-callback";
 
         protected static $sageone_client = null;
         protected static $_instance = null;
         protected static $_messages = false;
- 
-        private $_invoice_cache = array();
 
         /**
          * Creates and returns a singleton instance of this class.
@@ -62,14 +61,9 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
             if ( is_null( self::$sageone_client ) ) {
                 $client_id = get_option(self::OPTION_CLIENT_ID );
                 $client_secret = get_option(self::OPTION_CLIENT_SECRET );
-                $callback_url = get_option(self::OPTION_CALLBACK_URL );
-                if (!$callback_url) {
-                    $callback_url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-                    update_option( self::OPTION_CALLBACK_URL, $callback_url );
-                }
+                $callback_url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]" . self::CALLBACK_REQUEST_PATH;
 
-                self::$sageone_client = new SageApiClient($client_id, $client_secret, urlencode($callback_url), self::SCOPE);
-
+                self::$sageone_client = new SageApiClient($client_id, $client_secret, urlencode($callback_url));
             }
             return self::$sageone_client;
         }
@@ -109,7 +103,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
         /**
          * Adds an admin notice to be displayed to the user, formatted as a warning.
          *
-         * @param      <type>  $message  The message
+         * @param      string  $message  The message
          */
         public static function addAdminWarning($message) {
             self::log('WARN: ' . $message);
@@ -136,48 +130,6 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
             self::log("Clearing admin notices");
             WC_Admin_Notices::remove_notice( "ThinkingLogicWCSage" );
             self::$_messages = '';
-        }
-
-        /**
-         * Saves tokens from the given sage token_response.
-         * See: https://developers.sageone.com/docs/en/v1
-         *
-         * @param      string  $response  The response
-         */
-        public static function saveTokensFromResponse($response) {
-            if ($response) {
-                $tokens = json_decode($response, true);
-                $access_token = $tokens['access_token'];
-                update_option( self::OPTION_ACCESS_TOKEN, $access_token );
-                $refresh_token = $tokens['refresh_token'];
-                update_option( self::OPTION_REFRESH_TOKEN, $refresh_token );
-                $date = new DateTime();
-                $interval = new DateInterval('PT' . $tokens['expires_in'] . 'S');
-                $date = $date->add($interval); 
-                $expires = $date->format(self::DATE_TIME_FORMAT);
-                update_option( self::OPTION_ACCESS_TOKEN_EXPIRES, $expires );
-            }
-        }
-
-        /**
-         * Ensures that the access token is valid, refreshing it if necessary.
-         */
-        public static function refreshTokenIfNecessary() {
-            $now = new DateTime();
-            $expires = DateTime::createFromFormat(self::DATE_TIME_FORMAT, get_option(self::OPTION_ACCESS_TOKEN_EXPIRES));
-            if ($expires) {
-                if ($now >= $expires) {
-                    self::log("Refreshing token");
-                    $client = self::sageClient();
-                    $refresh_token = get_option(self::OPTION_REFRESH_TOKEN );
-                    $tokens = $client->renewAccessToken( $refresh_token );
-                    self::saveTokensFromResponse($tokens);
-                } else {
-                    self::log("token does not require refreshing");
-                }
-            } else {
-                self::log("Cannot renew token - no expires value found");
-            }
         }
 
         /**
@@ -346,18 +298,18 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
          * @return     string  the customer in json format
          */
         private function createCustomer($email, $name, $phone, $order) {
-            $params = array();
-            $params['contact[contact_type_id]'] = '1';
-            $params['contact[email]'] = $email;
-            $params['contact[name]'] = $name;
-            $params['contact[notes]'] = 'Created from ' . $_SERVER['HTTP_HOST'] . ' order #' . $order->get_id();
-            $params['contact[telephone]'] = $phone;
+	        $contact = array();
+	        $contact['contact_type_id'] = '1';
+	        $contact['email'] = $email;
+	        $contact['name'] = $name;
+	        $contact['notes'] = 'Created from ' . $_SERVER['HTTP_HOST'] . ' order #' . $order->get_id();
+	        $contact['telephone'] = $phone;
 
-            self::log("createCustomer: before filter: ". json_encode($params));
-            $params = apply_filters( ThinkingLogicWCSage::FILTER_CUSTOMER, $params, $order );
-            self::log("createCustomer: after filter: ". json_encode($params));
+            self::log("createCustomer: before filter: ". json_encode($contact));
+	        $contact = apply_filters( ThinkingLogicWCSage::FILTER_CUSTOMER, $contact, $order );
+            self::log("createCustomer: after filter: ". json_encode($contact));
 
-            $response = $this->postData('/contacts', $params);
+            $response = $this->postData('/contacts', ['contact' => $contact]);
             return $response;
         }
 
@@ -402,7 +354,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
         }
 
         /**
-         * List all invoices matching the given customer id and reference, within the range of dates given. 
+         * List all invoices matching the given customer id and reference, within the range of dates given.
          * See https://developers.sageone.com/docs/en/v1#sales_invoices-list_all_invoices.
          *
          * @param      string  $customer_id  The customer identifier
@@ -452,7 +404,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
                     $result = $invoice;
                 } else {
                     self::addAdminWarning('Unable to create invoice for ' . $invoice_amount . ' ' . $order->get_currency() . ' on ' . $invoice_date . ' : ' . json_encode($invoice) );
-                }         
+                }
             }
             return $result;
         }
@@ -482,50 +434,30 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
          * @param      object    $customer        The customer
          * @param      string    $invoice_date    The invoice date
          * @param      number    $invoice_amount  The invoice amount
-         * @return the response from sage, as a json-formatted string.
+         * @return the response from sage, as a json object.
          */
         private function createInvoice($order, $customer, $invoice_date, $invoice_amount) {
-            $params = array();
-            $params['sales_invoice[contact_id]'] = $customer->id;
-            $params['sales_invoice[contact_name]'] = $customer->name_and_company_name;
-            $params['sales_invoice[date]'] = $invoice_date;
-            $params['sales_invoice[due_date]'] = $invoice_date;
-            $params['sales_invoice[main_address]'] = $order->get_billing_email();
-            $params['sales_invoice[carriage_tax_code_id]'] = get_option(ThinkingLogicWCSage::OPTION_CARRIAGE_TAX_ID );
-            $params['sales_invoice[reference]'] = $this->invoiceReference($order);
-            $notes = 'WooCommerce order #' . $order->get_id() . ' (total ' .  $order->get_total() . ' ' . $order->get_currency() . ')';
-            $custom = get_post_custom($order->get_id());
-            if ( array_key_exists("Payer PayPal address", $custom) ) {
-                $notes .= ' paid via PayPal by: ';
-                $notes .= "name=" . $custom["Payer first name"][0] . ' ' . $custom["Payer last name"][0];
-                $notes .= ", email=" . $custom["Payer PayPal address"][0];
-            }
-            $notes .= ", transaction id=" . $order->get_transaction_id();
-            if ( array_key_exists("PayPal Transaction Fee", $custom) ) {
-                $notes .= ", transaction fee=" . $custom["PayPal Transaction Fee"][0];
-            }
-            $index = 0;
-            foreach ( $order->get_items() as $item ) {
-                if ( $item->is_type( 'line_item' ) ) {
-                    $prefix = 'sales_invoice[line_items_attributes][' . $index . ']';
-                    $params[$prefix . '[ledger_account_id]'] = (int) $this->getLedgerId($item);
-                    $params[$prefix . '[quantity]'] = $item->get_quantity();
-                    $line_item_amount = $item->get_total() * ($invoice_amount / $order->get_total());
-                    $params[$prefix . '[unit_price]'] = number_format( $line_item_amount / $item->get_quantity(), 2, '.', '' );
-                    $params[$prefix . '[tax_code]'] = get_option(self::OPTION_LINE_ITEM_TAX_ID);
-                    $description = $this->getLineItemDetail($item);
-                    $params[$prefix . '[description]'] = $description; 
-                    $index += 1;
+	        $sales_invoice = array();
+            $sales_invoice['contact_id'] = $customer->id;
+            $sales_invoice['contact_name'] = $customer->name_and_company_name;
+            $sales_invoice['date'] = $invoice_date;
+            $sales_invoice['due_date'] = $invoice_date;
+            $sales_invoice['carriage_tax_code_id'] = get_option(ThinkingLogicWCSage::OPTION_CARRIAGE_TAX_ID );
+            $sales_invoice['reference'] = $this->invoiceReference($order);
+	        $sales_invoice['notes'] = $this->getSalesInvoiceNotes( $order );
+	        $line_items = array();
+	        foreach ( $order->get_items() as $item ) {
+	            if ( $item->is_type( 'line_item' ) ) {
+		            $line_items[] = $this->getSalesInvoiceLineItem( $order, $item, $invoice_amount );
                 }
             }
+	        $sales_invoice['invoice_lines'] = $line_items;
 
-            $params['sales_invoice[notes]'] = $notes;
+            self::log("createInvoice: before filter: ". json_encode($sales_invoice));
+	        $sales_invoice = apply_filters( ThinkingLogicWCSage::FILTER_INVOICE, $sales_invoice, $order );
+            self::log("createInvoice: after filter: ". json_encode($sales_invoice));
 
-            self::log("createInvoice: before filter: ". json_encode($params));
-            $params = apply_filters( ThinkingLogicWCSage::FILTER_INVOICE, $params, $order );
-            self::log("createInvoice: after filter: ". json_encode($params));
-
-            $response = json_decode($this->postData('/sales_invoices', $params));
+            $response = json_decode($this->postData('/sales_invoices', ['sales_invoice' => $sales_invoice]));
             return $response;
         }
 
@@ -563,17 +495,15 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
          * Makes a post request to to SageOne, refreshing the token if necessary and generating all required headers.
          *
          * @param      string  $endpoint  The endpoint, the portion after the BASE_ENDPOINT
-         * @param      array   $params    The parameters
+         * @param      string  $postData  Object representing the body of the post request
          *
          * @return     string  The response from SageOne.
          */
-        private function postData($endpoint, $params) {
-            self::refreshTokenIfNecessary();
+        private function postData($endpoint, $postData) {
             $url = self::BASE_ENDPOINT . $endpoint;
             $client = self::sageClient();
-            $headers = $this->getHeaders();
-            $response = $client->postData($url, $params, $headers);
-            return $response;
+
+	        return $client->execApiRequest( $url, 'POST', json_encode($postData) );
         }
 
         /**
@@ -584,28 +514,53 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
          * @return     string  The response from SageOne.
          */
         private function getData($endpoint) {
-            self::refreshTokenIfNecessary();
             $url = self::BASE_ENDPOINT . $endpoint;
-            $headers = $this->getHeaders();
             $client = self::sageClient();
-            $response = $client->getData($url, $headers);
-            return $response;
+
+	        return $client->execApiRequest( $url, 'GET' );
         }
 
-        /**
-         * Constructs an array of headers for the given request.
-         *
-         * @return     array   The headers.
-         */
-        private function getHeaders() {
-            $token = get_option(self::OPTION_ACCESS_TOKEN);
+	    /**
+	     * @param $order
+	     *
+	     * @return string
+	     */
+	    private function getSalesInvoiceNotes( $order ) {
+		    $notes  = 'WooCommerce order #' . $order->get_id() . ' (total ' . $order->get_total() . ' ' . $order->get_currency() . ')';
+		    $notes .= ", payment method=" . $order->get_payment_method();
+		    $custom = get_post_custom( $order->get_id() );
+		    if ( array_key_exists( "Payer PayPal address", $custom ) ) {
+			    $notes .= ' paid via PayPal by: ';
+			    $notes .= "name=" . $custom["Payer first name"][0] . ' ' . $custom["Payer last name"][0];
+			    $notes .= ", email=" . $custom["Payer PayPal address"][0];
+		    }
+		    $notes .= ", transaction id=" . $order->get_transaction_id();
+		    if ( array_key_exists( "PayPal Transaction Fee", $custom ) ) {
+			    $notes .= ", transaction fee=" . $custom["PayPal Transaction Fee"][0];
+		    }
 
-            $header = array("Accept: *.*",
-                "Content_Type: application/x-www-form-urlencoded",
-                "User-Agent: " . self::APPLICATION_NAME,
-                "Authorization: Bearer " . $token);
+		    return $notes;
+	    }
 
-            return $header;
-        }
+	    /**
+	     * @param $order
+	     * @param $item
+	     * @param $invoice_amount
+	     *
+	     * @return array
+	     */
+	    private function getSalesInvoiceLineItem( $order, $item, $invoice_amount ) {
+		    $line_item_amount          = $item->get_total() * ( $invoice_amount / $order->get_total() );
+		    $description               = $this->getLineItemDetail( $item );
+		    $item                      = array();
+		    $item['ledger_account_id'] = (int) $this->getLedgerId( $item );
+		    $item['quantity']          = $item->get_quantity();
+		    $item['unit_price']        = number_format( $line_item_amount / $item->get_quantity(), 2, '.', '' );
+		    $item['total_amount']      = $line_item_amount;
+		    $item['tax_rate_id']       = get_option( self::OPTION_LINE_ITEM_TAX_ID, 'no_tax' );
+		    $item['description']       = $description;
+
+		    return $item;
+	    }
     }
 }
