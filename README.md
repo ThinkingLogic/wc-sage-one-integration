@@ -5,8 +5,49 @@ Based on code samples provided here: https://github.com/Sage/sageone_api_php_sam
 An integration with the Sage One api (v3.1) for WooCommerce - 
 allowing orders to be turned into Sage One invoices at the click of a button (per order). 
 
-This WordPress plugin is intended for use with a WooCommerce-based website that allows customers to book courses that
-occur over several weeks.
+This WordPress plugin is intended for use with a WooCommerce-based website.
 
-One invoice will be created per order per month. 
-Each invoice will be allocated a fraction of the total cost of the order, according to how many lessons occur in that month.
+Once the plugin has been installed, go to Wordpress Dashboard -> Settings -> Sage One Integration
+to complete the setup (you will need to register an application with developerselfservice.sageone.com).
+
+By default, a single invoice will be created based on the date of the order.
+Filters allow this to be amended, e.g. to split the cost of the order over several invoices.
+
+If a 'customer' contact can be found in Sage with the same email address as the WooCommerce order, that contact will be used for the invoices.
+Otherwise a new contact will be created using details from the order. By default no address details will be used - these can be added/amended via a filter if necessary. 
+
+Filters that can be hooked into:
+
+**tl_wc_sage_filter_invoice_dates:**
+```$php
+ /**
+  * Filters the invoice dates & amounts for the given order.
+  *
+  * @param      array     $invoice_amounts  Associative array [invoice_date => invoice_amount], where invoice_date is in the format 'd/m/Y'.
+  * @param      WC_Order  $order            The order
+  * @return     array     $invoice_amounts  Associative array [invoice_date => invoice_amount], where invoice_date is in the format 'd/m/Y'.
+  */
+``` 
+
+**tl_wc_sage_filter_create_customer:**
+```$php
+ /**
+  * Filters the fields passed to Sage when creating a contact for the customer.
+  *
+  * @param      array     $contact          Associative array representing the json object sent to sage when creating the contact.
+  * @param      WC_Order  $order            The order
+  * @return     array     $invoice_amounts  Associative array representing the json object sent to sage when creating the contact.
+  */
+``` 
+ 
+**tl_wc_sage_filter_create_invoice:**
+```$php
+ /**
+  * Filters the fields passed to Sage when creating a sales invoice.
+  *
+  * @param      array     $contact          Associative array representing the json object sent to sage when creating the contact.
+  * @param      WC_Order  $order            The order
+  * @return     array     $invoice_amounts  Associative array representing the json object sent to sage when creating the contact.
+  */
+``` 
+ 

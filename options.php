@@ -20,7 +20,8 @@ if (ThinkingLogicWCSage::hasClientDetails()) {
 
 $refreshTokenExpires = get_option( ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES );
 
-$test_url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+$base_url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]";
+$test_url = $base_url . "$_SERVER[REQUEST_URI]";
 $test_url = substr($test_url, 0, strpos($test_url, '?')) . '?page=tl-wc-sage-plugin-options'
 
 ?>
@@ -36,7 +37,11 @@ $test_url = substr($test_url, 0, strpos($test_url, '?')) . '?page=tl-wc-sage-plu
 	        echo '</strong></p><hr/>';
         }
     ?>
-    <p>You should have registered this as an application with <a href="https://developers.sageone.com/applications/">developers.sageone.com</a> (requires a github login) - once registered it will provide you with the Client ID and Client Secret to enter below.</p>
+    <p>You should have registered this as an application with <a href="https://developerselfservice.sageone.com/user">developerselfservice.sageone.com</a> (requires a github login) - once registered it will provide you with the Client ID and Client Secret to enter below.
+        <br/>
+        When registering the application with Sage, ensure to include a callback url of: <?php echo $base_url . ThinkingLogicWCSage::CALLBACK_REQUEST_PATH ?>
+    </p>
+
     <table class="form-table">
         <tr valign="top">
         <th scope="row">Client ID</th>
@@ -53,7 +58,7 @@ $test_url = substr($test_url, 0, strpos($test_url, '?')) . '?page=tl-wc-sage-plu
             <th scope="row">Shipping Tax Rate id</th>
             <td>
                 <input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_SHIPPING_TAX_ID ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_SHIPPING_TAX_ID, ThinkingLogicWCSage::DEFAULT_TAX_ID ) ); ?>" />
-                <a class="button" href="<?php echo (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]" . "&test_endpoint=/tax_rates" ?>">List Tax Rates</a></td>
+                <a class="button" href="<?php echo $test_url ?>&test_endpoint=/tax_rates" ?>List Tax Rates</a></td>
             </tr>
 
             <tr valign="top">
@@ -63,9 +68,11 @@ $test_url = substr($test_url, 0, strpos($test_url, '?')) . '?page=tl-wc-sage-plu
             </tr>
 
             <tr valign="top">
-            <th scope="row">Log API request/responses for debugging (true|false) - only takes effect if the WP_DEBUG and WP_DEBUG_LOG constants are set to true</th>
+            <th scope="row">Log API request/responses</th>
             <td>
-                <input type="text" name="<?php echo Logger::OPTION_LOG_DEBUG ?>" value="<?php echo esc_attr( get_option(Logger::OPTION_LOG_DEBUG, 'false' ) ); ?>" /></td>
+                <input type="text" name="<?php echo Logger::OPTION_LOG_DEBUG ?>" value="<?php echo esc_attr( get_option(Logger::OPTION_LOG_DEBUG, 'false' ) ); ?>" />
+                (true|false) for debugging - only takes effect if the WP_DEBUG and WP_DEBUG_LOG constants are set to true
+            </td>
             </tr>
 
             <tr valign="top">
@@ -77,7 +84,7 @@ $test_url = substr($test_url, 0, strpos($test_url, '?')) . '?page=tl-wc-sage-plu
             </tr>
 
             <tr valign="top">
-            <th scope="row">Expires at</th>
+            <th scope="row">Access Token Expires at</th>
             <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ) ); ?>" />
                 (<?php echo gmdate(ThinkingLogicWCSage::DATE_TIME_FORMAT, get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES )); ?>, Time now: <?php $now=new DateTime(); echo $now->format(ThinkingLogicWCSage::DATE_TIME_FORMAT); ?>)
             </td>
@@ -89,11 +96,9 @@ $test_url = substr($test_url, 0, strpos($test_url, '?')) . '?page=tl-wc-sage-plu
             </tr>
 
             <tr valign="top">
-                <th scope="row">Refresh Token Expires in (seconds)</th>
-                <td>
-                    <input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES ?>" value="<?php echo esc_attr( $refreshTokenExpires ); ?>" />
-                    (<?php echo number_format ( $refreshTokenExpires / ( 60 * 60) ); ?> hours
-                    = <?php echo number_format ( $refreshTokenExpires / ( 60 * 60 * 24) ); ?> days)
+                <th scope="row">Refresh Token Expires at</th>
+                <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES_AT ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES_AT ) ); ?>" />
+                    (<?php echo gmdate(ThinkingLogicWCSage::DATE_TIME_FORMAT, get_option(ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES_AT )); ?>, Time now: <?php $now=new DateTime(); echo $now->format(ThinkingLogicWCSage::DATE_TIME_FORMAT); ?>)
                 </td>
             </tr>
 

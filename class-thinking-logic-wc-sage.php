@@ -22,12 +22,12 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
         const OPTION_SHIPPING_TAX_ID           = 'tl_wc_sage_shipping_tax_id';
 	    const OPTION_LINE_ITEM_TAX_ID          = 'tl_wc_sage_line_item_tax_id';
 	    const OPTION_LEDGER_CODES              = 'tl_wc_sage_ledger_codes';
-	    const FILTER_INVOICE_DATES             = 'tl_wc_sage_filter_invoice_dates';
 
+	    const FILTER_INVOICE_DATES             = 'tl_wc_sage_filter_invoice_dates';
 	    const FILTER_CUSTOMER                  = 'tl_wc_sage_filter_create_customer';
 	    const FILTER_INVOICE                   = 'tl_wc_sage_filter_create_invoice';
-	    const PRODUCT_FIELD_LEDGER_CODE        = '_tl_wc_sage_ledger_code';
 
+	    const PRODUCT_FIELD_LEDGER_CODE        = '_tl_wc_sage_ledger_code';
 	    const ORDER_FIELD_CUSTOMER_ID          = '_tl_wc_sage_customer_id';
 	    const ORDER_FIELD_CUSTOMER_LINK        = '_tl_wc_sage_customer_link';
 	    const SAGEONE_UI_URL_BASE              = 'https://accounts-extra.sageone.com';
@@ -157,7 +157,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
                     $map[strval($ledger->nominal_code)] = $ledger->id;
                 }
                 $map_json = json_encode($map);
-                Logger::log('ledgerCodeMap built from ' . sizeof($ledgers) . ' ledgers: ' . $map_json);
+                Logger::debug('ledgerCodeMap built from ' . sizeof($ledgers) . ' ledgers: ' . $map_json);
                 update_option(self::OPTION_LEDGER_CODES, $map_json);
             }
             return json_decode(get_option(self::OPTION_LEDGER_CODES), true);
@@ -275,7 +275,9 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		        ]
 	        ];
 
+            self::log("createCustomer: before filter: ". json_encode($contact));
 	        $contact = apply_filters( ThinkingLogicWCSage::FILTER_CUSTOMER, $contact, $order );
+            self::log("createCustomer: after filter: ". json_encode($contact));
 
 	        return $this->postData('/contacts', [ 'contact' => $contact]);
         }
@@ -427,7 +429,9 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
             }
 	        $sales_invoice['invoice_lines'] = $line_items;
 
+	        Logger::log("createInvoice: before filter: ". json_encode($sales_invoice));
 	        $sales_invoice = apply_filters( ThinkingLogicWCSage::FILTER_INVOICE, $sales_invoice, $order );
+	        Logger::log("createInvoice: after filter: ". json_encode($sales_invoice));
 
             $response = $this->postData('/sales_invoices', ['sales_invoice' => $sales_invoice])->getJSON();
             return $response;
@@ -441,8 +445,8 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 	     * @return array
 	     */
 	    private function getSalesInvoiceLineItem( $order, $item, $invoice_amount ) {
-		    $line_item_amount          = $item->get_total() * ( $invoice_amount / $order->get_total() );
-		    $description               = $this->getLineItemDetail( $item );
+		    $line_item_amount  = $this->calculateLineItemAmount( $order, $item, $invoice_amount );
+		    $description = $this->getLineItemDetail( $item );
 		    $line_item = [
 			    'ledger_account_id' => $this->getLedgerId( $item ),
 			    'quantity' => $item->get_quantity(),
@@ -453,6 +457,13 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		    ];
 
 		    return $line_item;
+	    }
+
+	    private function calculateLineItemAmount( $order, $item, $invoice_amount ) {
+	    	if ( $order->get_total() == 0 ) {
+	    		return 0;
+		    }
+		    return $item->get_total() * ( $invoice_amount / $order->get_total() );
 	    }
 
 	    /**
