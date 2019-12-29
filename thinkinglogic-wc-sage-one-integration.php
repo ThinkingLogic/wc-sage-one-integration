@@ -12,10 +12,13 @@
  * Domain Path:       /languages
  */
 
+use ThinkingLogic\Logger;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
 
+require_once( dirname( __FILE__ ) . '/Logger.php' );
 require_once( dirname( __FILE__ ) . '/SageApiClient.php' );
 require_once( dirname( __FILE__ ) . '/class-thinking-logic-wc-sage.php' );
 
@@ -26,7 +29,7 @@ if ( is_admin() ) { // admin actions
 	add_action( 'woocommerce_order_actions_end', 'tl_wc_sage_order_actions' );
 	add_action( 'woocommerce_admin_order_data_after_billing_address', 'tl_wc_sage_order_customer_link' );
 	add_action( 'save_post', 'tl_wc_sage_create_invoices', 10, 3 );
-	add_action( 'admin_notices', 'tl_wc_sage_clear_notices', 999 );
+	add_action( 'admin_notices', 'tl_wc_display_admin_notices' );
 	add_action( 'woocommerce_product_options_advanced', 'tl_wc_sage_show_product_fields' );
 	add_action( 'woocommerce_process_product_meta', 'tl_wc_sage_save_product_fields' );
 } else {
@@ -41,10 +44,10 @@ function tl_wc_sage_callback_handler() {
 		$sageone_client      = ThinkingLogicWCSage::sageClient();
 		$authorisation_code  = $_GET['code'];
 		$authorisation_state = $_GET['state'];
-		ThinkingLogicWCSage::log( "Received authorisation code : " . $authorisation_code . " with state " . $authorisation_state );
+		Logger::log( "Received authorisation code : " . $authorisation_code . " with state " . $authorisation_state );
 		/* Exchange the authorisation code for an access_token */
 		$response = $sageone_client->getInitialAccessToken( $authorisation_code, $authorisation_state );
-		ThinkingLogicWCSage::log( "Got response from Sage: " . $response );
+		Logger::log( "Got response from Sage: " . $response );
 		if ( isset( $response ) ) {
 			// redirect back to settings
 			wp_redirect( home_url( '/wp-admin/options-general.php?page=tl-wc-sage-plugin-options' ) );
@@ -80,8 +83,12 @@ function tl_wc_sage_register_settings() { // whitelist options
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_ACCESS_TOKEN );
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES );
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_CALLBACK_URL );
-	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_CARRIAGE_TAX_ID );
+	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_SHIPPING_TAX_ID );
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_LINE_ITEM_TAX_ID );
+	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_LEDGER_CODES );
+
+	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, Logger::OPTION_CUSTOM_NOTICES );
+	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, Logger::OPTION_LOG_DEBUG );
 }
 
 /**
@@ -133,7 +140,9 @@ function tl_wc_sage_create_invoices( $post_id, $post, $update ) {
  * @param WC_Order $order The order
  */
 function tl_wc_sage_order_customer_link( $order ) {
-	if ( $order->meta_exists( ThinkingLogicWCSage::ORDER_FIELD_CUSTOMER_ID ) ) {
+	if ( $order->meta_exists( ThinkingLogicWCSage::ORDER_FIELD_CUSTOMER_LINK ) ) {
+		echo '<p><a href="' . $order->get_meta( ThinkingLogicWCSage::ORDER_FIELD_CUSTOMER_LINK ) . '">View customer in SageOne</a></p>';
+	} else if ( $order->meta_exists( ThinkingLogicWCSage::ORDER_FIELD_CUSTOMER_ID ) ) {
 		echo '<p><a href="' . ThinkingLogicWCSage::SAGEONE_UI_URL_BASE . '/contacts/customers/' . $order->get_meta( ThinkingLogicWCSage::ORDER_FIELD_CUSTOMER_ID ) . '">View customer in SageOne</a></p>';
 	}
 }
@@ -166,10 +175,11 @@ function tl_wc_sage_save_product_fields( $post_id ) {
 }
 
 /**
- * Clears all custom notices.
+ * Displays and clears all custom notices.
  *
  * @param <type> $post_id The post identifier
  */
-function tl_wc_sage_clear_notices( $post_id ) {
-	ThinkingLogicWCSage::clearAdminNotices();
+function tl_wc_display_admin_notices( $post_id ) {
+	Logger::showAdminNotices();
+	Logger::clearAdminNotices();
 }

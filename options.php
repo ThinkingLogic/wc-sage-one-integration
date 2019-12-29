@@ -1,28 +1,27 @@
 <?php
 
+use ThinkingLogic\Logger;
+
 $sageone_client = false;
-$response = false;
-$client = false;
+$response       = false;
+$client         = false;
 
 if (ThinkingLogicWCSage::hasClientDetails()) {
 	$client = ThinkingLogicWCSage::instance();
 	$sageone_client = ThinkingLogicWCSage::sageClient();
 	$test_client = $_GET['test_client'];
-	$list_tax_rates = $_GET['list_tax_rates'];
-	$list_contact_types = $_GET['list_contact_types'];
 	$test_endpoint = $_GET['test_endpoint'];
 	if ($test_client) {
         $response = $client->listCustomers();
-    } elseif ($list_tax_rates) {
-        $response = $client->listTaxRates();
-    } elseif ($list_contact_types) {
-		$response = $client->makeGetRequest('/contact_types');
     } elseif ($test_endpoint) {
         $response = $client->makeGetRequest($test_endpoint);
     }
 }
 
 $refreshTokenExpires = get_option( ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES );
+
+$test_url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+$test_url = substr($test_url, 0, strpos($test_url, '?')) . '?page=tl-wc-sage-plugin-options'
 
 ?>
 <div class="wrap">
@@ -51,15 +50,22 @@ $refreshTokenExpires = get_option( ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXP
 
         <?php if($sageone_client) { ?>
             <tr valign="top">
-            <th scope="row">Carriage Tax Rate id</th>
+            <th scope="row">Shipping Tax Rate id</th>
             <td>
-                <input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_CARRIAGE_TAX_ID ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_CARRIAGE_TAX_ID, '5' ) ); ?>" /> <a class="button" href="<?php echo (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]" . "&list_tax_rates=true" ?>">List Tax Rates</a></td>
+                <input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_SHIPPING_TAX_ID ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_SHIPPING_TAX_ID, ThinkingLogicWCSage::DEFAULT_TAX_ID ) ); ?>" />
+                <a class="button" href="<?php echo (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]" . "&test_endpoint=/tax_rates" ?>">List Tax Rates</a></td>
             </tr>
 
             <tr valign="top">
             <th scope="row">Line item Tax Rate id</th>
             <td>
-                <input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_LINE_ITEM_TAX_ID ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_LINE_ITEM_TAX_ID, '5' ) ); ?>" /></td>
+                <input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_LINE_ITEM_TAX_ID ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_LINE_ITEM_TAX_ID, ThinkingLogicWCSage::DEFAULT_TAX_ID ) ); ?>" /></td>
+            </tr>
+
+            <tr valign="top">
+            <th scope="row">Log API request/responses for debugging (true|false) - only takes effect if the WP_DEBUG and WP_DEBUG_LOG constants are set to true</th>
+            <td>
+                <input type="text" name="<?php echo Logger::OPTION_LOG_DEBUG ?>" value="<?php echo esc_attr( get_option(Logger::OPTION_LOG_DEBUG, 'false' ) ); ?>" /></td>
             </tr>
 
             <tr valign="top">
@@ -72,7 +78,9 @@ $refreshTokenExpires = get_option( ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXP
 
             <tr valign="top">
             <th scope="row">Expires at</th>
-            <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ) ); ?>" /> (<?php echo gmdate(ThinkingLogicWCSage::DATE_TIME_FORMAT, get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES )); ?>, Time now: <?php $now=new DateTime(); echo $now->format(ThinkingLogicWCSage::DATE_TIME_FORMAT); ?>)</td>
+            <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ?>" value="<?php echo esc_attr( get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ) ); ?>" />
+                (<?php echo gmdate(ThinkingLogicWCSage::DATE_TIME_FORMAT, get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES )); ?>, Time now: <?php $now=new DateTime(); echo $now->format(ThinkingLogicWCSage::DATE_TIME_FORMAT); ?>)
+            </td>
             </tr>
 
             <tr valign="top">
@@ -93,12 +101,13 @@ $refreshTokenExpires = get_option( ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXP
         <?php 
         $access_token = get_option(ThinkingLogicWCSage::OPTION_ACCESS_TOKEN );
         if($access_token) { 
-            $test_url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
             ?>
             <tr valign="top">
             <th scope="row"></th>
             <td><a class="button" href="<?php echo $test_url ?>&test_client=true">Test Sage connection by listing customers</a>
-                <a class="button" href="<?php echo $test_url ?>&list_contact_types=true">List contact types</a>
+                <a class="button" href="<?php echo $test_url ?>&test_endpoint=/contact_types">List contact types</a>
+                <a class="button" href="<?php echo $test_url ?>&test_endpoint=/contact_person_types">List contact person types</a>
+                <a class="button" href="<?php echo $test_url ?>&test_endpoint=/ledger_accounts<?php echo urlencode('?items_per_page=100&attributes=nominal_code') ?>">List Ledger accounts</a>
             </td>
             </tr>
             <tr valign="top">
@@ -127,9 +136,8 @@ $refreshTokenExpires = get_option( ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXP
 </div>
 <script language="javascript">
     function testEndpoint() {
-        var loc = location.href;        
-        loc += loc.indexOf("?") === -1 ? "?" : "&";
+        var loc = "<?php echo $test_url ?>";
 
-        location.href = loc + "test_endpoint=" + document.getElementById('_tl_test_endpoint').value;
+        location.href = loc + "&test_endpoint=" + encodeURI(document.getElementById('_tl_test_endpoint').value);
     }
 </script>
