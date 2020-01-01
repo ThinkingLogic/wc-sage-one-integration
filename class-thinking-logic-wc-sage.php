@@ -275,9 +275,9 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		        ]
 	        ];
 
-            self::log("createCustomer: before filter: ". json_encode($contact));
+            Logger::log("createCustomer: before filter: ". json_encode($contact));
 	        $contact = apply_filters( ThinkingLogicWCSage::FILTER_CUSTOMER, $contact, $order );
-            self::log("createCustomer: after filter: ". json_encode($contact));
+            Logger::log("createCustomer: after filter: ". json_encode($contact));
 
 	        return $this->postData('/contacts', [ 'contact' => $contact]);
         }

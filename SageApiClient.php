@@ -99,24 +99,25 @@ class SageApiClient {
 		try {
 			$newAccessToken = $this->oauthClient->getAccessToken( 'refresh_token', [ 'refresh_token' => $this->getRefreshToken() ] );
 			Logger::log("renewAccessToken: token renewed");
+			$this->storeAccessToken( $newAccessToken );
 		} catch ( \League\OAuth2\Client\Grant\Exception\InvalidGrantException $e ) {
 			// refresh token was not found or is invalid
 			Logger::log("Unable to renewAccessToken - InvalidGrantException: " . $e->getMessage());
-			Logger::addAdminWarning( $e->getMessage() );
+			$this->warnAccessTokenError( $e->getMessage() );
 		} catch ( \League\OAuth2\Client\Provider\Exception\IdentityProviderException $e ) {
 			// refresh token was not found or is invalid
 			Logger::log("Unable to renewAccessToken - IdentityProviderException: " . $e->getMessage());
-			Logger::addAdminWarning( $e->getMessage() );
+			$this->warnAccessTokenError( $e->getMessage() );
 		} catch ( \GuzzleHttp\Exception\ConnectException $e ) {
 			// if no internet connection is available
 			Logger::log("Unable to renewAccessToken - ConnectException: " . $e->getMessage());
-			Logger::addAdminWarning( $e->getMessage() );
+			$this->warnAccessTokenError( $e->getMessage() );
 		} catch ( \Exception $e ) {
 			// general exception
 			Logger::log("Unable to getInitialAccessToken - message: " . $e->getMessage());
-			Logger::addAdminWarning( $e->getMessage() );
+			$this->warnAccessTokenError( $e->getMessage() );
 		} finally {
-			return $this->storeAccessToken( $newAccessToken );
+			return $newAccessToken;
 		}
 	}
 
@@ -254,16 +255,9 @@ class SageApiClient {
 		$this->generatedState = $randomString;
 	}
 
-
-	/**
-	 * Logs a message to the error log, if both WP_DEBUG and WP_DEBUG_LOG are true.
-	 *
-	 * @param      string  $message  The message
-	 */
-	private static function log($message) {
-		if (constant('WP_DEBUG') && constant('WP_DEBUG_LOG')) {
-			error_log("ThinkingLogicWCSage: " . $message);
-		}
+	private function warnAccessTokenError($message) {
+		Logger::addAdminWarning( $message );
+		Logger::addAdminNotice('<a class="button" href="' . $this->authorizationEndpoint() .'">Refresh Authorisation</a>');
 	}
 
 }
