@@ -12,6 +12,7 @@ to complete the setup (you will need to register an application with developerse
 
 By default, a single invoice will be created based on the date of the order.
 Filters allow this to be amended, e.g. to split the cost of the order over several invoices.
+If an invoice with the same reference (the id of the order) and date already exists for the customer then no invoice will be created.
 
 If a 'customer' contact can be found in Sage with the same email address as the WooCommerce order, that contact will be used for the invoices.
 Otherwise a new contact will be created using details from the order. By default no address details will be used - these can be added/amended via a filter if necessary. 
