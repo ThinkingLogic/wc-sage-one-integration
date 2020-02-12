@@ -14,7 +14,7 @@ if (ThinkingLogicWCSage::hasClientDetails()) {
 	if ($test_client) {
         $response = $client->listCustomers();
     } elseif ($test_endpoint) {
-        $response = $client->makeGetRequest($test_endpoint);
+        $response = $client->makeGetRequest( urldecode( $test_endpoint ) );
     }
 }
 
@@ -35,6 +35,9 @@ $test_url = substr($test_url, 0, strpos($test_url, '?')) . '?page=tl-wc-sage-plu
             echo '<p><strong>Your Refresh Token expires soon - you should:<br/>';
 	        echo '<a class="button" href="' . $sageone_client->authorizationEndpoint() .'">Refresh Authorisation</a>';
 	        echo '</strong></p><hr/>';
+        }
+        if ( $response ) {
+            echo '<h2>View the results of the call to Sage One at the bottom of the page</h2>';
         }
     ?>
     <p>You should have registered this as an application with <a href="https://developerselfservice.sageone.com/user">developerselfservice.sageone.com</a> (requires a github login) - once registered it will provide you with the Client ID and Client Secret to enter below.
@@ -108,8 +111,8 @@ $test_url = substr($test_url, 0, strpos($test_url, '?')) . '?page=tl-wc-sage-plu
         if($access_token) { 
             ?>
             <tr valign="top">
-            <th scope="row"></th>
-            <td><a class="button" href="<?php echo $test_url ?>&test_client=true">Test Sage connection by listing customers</a>
+            <th scope="row">Test Sage connection</th>
+            <td><a class="button" href="<?php echo $test_url ?>&test_client=true">List customers</a>
                 <a class="button" href="<?php echo $test_url ?>&test_endpoint=/contact_types">List contact types</a>
                 <a class="button" href="<?php echo $test_url ?>&test_endpoint=/contact_person_types">List contact person types</a>
                 <a class="button" href="<?php echo $test_url ?>&test_endpoint=/ledger_accounts<?php echo urlencode('?items_per_page=100&attributes=nominal_code') ?>">List Ledger accounts</a>
@@ -143,6 +146,6 @@ $test_url = substr($test_url, 0, strpos($test_url, '?')) . '?page=tl-wc-sage-plu
     function testEndpoint() {
         var loc = "<?php echo $test_url ?>";
 
-        location.href = loc + "&test_endpoint=" + encodeURI(document.getElementById('_tl_test_endpoint').value);
+        location.href = loc + "&test_endpoint=" + encodeURIComponent(document.getElementById('_tl_test_endpoint').value);
     }
 </script>

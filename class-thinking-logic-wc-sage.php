@@ -344,7 +344,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
             $last = end($formatted_dates);
             $result = array();
 
-            $url = '/sales_invoices?contact_id=' . $customer_id . '&from_date=' . $first . '&to_date=' . $last . '&items_per_page=200';
+            $url = '/sales_invoices?contact_id=' . $customer_id . '&attributes=reference' . '&from_date=' . $first . '&to_date=' . $last . '&items_per_page=200';
             $response = $this->getData($url)->getJSON();
             if ($response->{'$total'} > 0) {
                 $result = $this->mapInvoicesByDate($response->{'$items'}, $reference);
