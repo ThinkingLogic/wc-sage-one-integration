@@ -328,7 +328,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 	     *
 	     * @param string $customer_id The customer identifier
 	     * @param string $reference The reference - e.g. order id
-	     * @param $dates
+	     * @param array  $dates - array of dates formatted as DATE_FORMAT.
 	     *
 	     * @return     array   existing invoices as returned by Sage, keyed by the invoice date.
 	     */
@@ -355,11 +355,11 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
         /**
          * Creates an invoice in SageOne (if one for the given customer, order and date cannot be found).
          *
-         * @param      WC_Order  $order             The order
-         * @param      object    $customer          The customer
-         * @param      string    $invoice_date      The invoice date
+         * @param      WC_Order         $order             The order
+         * @param      object           $customer          The customer
+         * @param      string           $invoice_date      The invoice date
          * @param      number    $invoice_amount    The invoice amount
-         * @param      array     $existing_invoices array of existing invoices, keyed by date
+         * @param      array            $existing_invoices array of existing invoices, keyed by date
          * @return     object the invoice that was created, or null if not created.
          */
         private function maybeCreateInvoice($order, $customer, $invoice_date, $invoice_amount, $existing_invoices) {
@@ -403,28 +403,30 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
          * @param      object    $customer        The customer
          * @param      string    $invoice_date    The invoice date
          * @param      number    $invoice_amount  The invoice amount
-         * @return the response from sage, as a json object.
+         * @return     object    the response from sage, as a json object.
          */
         private function createInvoice($order, $customer, $invoice_date, $invoice_amount) {
+        	$invoice_fraction = $this->calculateInvoiceFraction( $order, $invoice_amount);
+        	$shipping_net = ( floatval ( $order->get_shipping_total() ) - floatval ( $order->get_shipping_tax() ) ) * $invoice_fraction;
 	        $sales_invoice = [
-	            'contact_id' => $customer->id,
-	            'date' => $invoice_date,
-	            'contact_name' => $customer->displayed_as,
-	            'due_date' => $invoice_date,
-	            'reference' => $this->invoiceReference($order),
-	            'notes' => $this->getSalesInvoiceNotes( $order ),
+	            'contact_id'           => $customer->id,
+	            'date'                 => $invoice_date,
+	            'contact_name'         => $customer->displayed_as,
+	            'due_date'             => $invoice_date,
+	            'reference'            => $this->invoiceReference($order),
+	            'notes'                => $this->getSalesInvoiceNotes( $order ),
+	            'shipping_net_amount'  => number_format( $shipping_net, 2, '.', '' ),
 	            'shipping_tax_rate_id' => get_option(ThinkingLogicWCSage::OPTION_SHIPPING_TAX_ID, ThinkingLogicWCSage::DEFAULT_TAX_ID ),
-		        'main_address' => [ // sage requires an invoice address :(
+		        'main_address'         => [ // sage requires an invoice address :(
 		        	'address_type_id' => ThinkingLogicWCSage::ADDRESS_TYPE_ID,
-			        'address_line_1' => 'N/A',
-//			        'postal_code' => 'BS11AA'
+			        'address_line_1' => 'N/A'
 		        ],
 	        ];
 	        $line_items = array();
 	        $order_items = $order->get_items();
 	        foreach ( $order_items as $item ) {
 	            if ( $item->is_type( 'line_item' ) ) {
-		            $line_items[] = $this->getSalesInvoiceLineItem( $order, $item, $invoice_amount );
+		            $line_items[] = $this->getSalesInvoiceLineItem($item, $invoice_fraction );
                 }
             }
 	        $sales_invoice['invoice_lines'] = $line_items;
@@ -438,32 +440,39 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
         }
 
 	    /**
-	     * @param $order
-	     * @param $item
-	     * @param $invoice_amount
+	     * @param      WC_Order  $order           The order
+	     * @param      float     $invoice_amount  The invoice amount
+	     *
+	     * @return float the fraction of the total order value accounted for by this invoice.
+	     */
+	    private function calculateInvoiceFraction( $order, $invoice_amount ) {
+		    if ( $order->get_total() == 0 ) {
+			    return 1;
+		    }
+		    return $invoice_amount / $order->get_total();
+	    }
+
+	    /**
+	     * @param      WC_Order_Item    $item        The item
+	     * @param      float            $invoice_fraction the fraction of the order value accounted for by this invoice.
 	     *
 	     * @return array
 	     */
-	    private function getSalesInvoiceLineItem( $order, $item, $invoice_amount ) {
-		    $line_item_amount  = $this->calculateLineItemAmount( $order, $item, $invoice_amount );
+	    private function getSalesInvoiceLineItem( $item, $invoice_fraction ) {
+		    $line_item_amount = $item->get_total() * $invoice_fraction;
+		    $line_item_tax = $item->get_total_tax() * $invoice_fraction;
 		    $description = $this->getLineItemDetail( $item );
-		    $line_item = [
+
+		    return [
 			    'ledger_account_id' => $this->getLedgerId( $item ),
 			    'quantity' => $item->get_quantity(),
 			    'unit_price' => number_format( $line_item_amount / $item->get_quantity(), 2, '.', '' ),
-			    'total_amount' => $line_item_amount,
-			    'tax_rate_id' => get_option( self::OPTION_LINE_ITEM_TAX_ID, ThinkingLogicWCSage::DEFAULT_TAX_ID ),
-			    'description' => $description,
+			    'unit_price_includes_tax' => 'true',
+			    'total_amount' => number_format( $line_item_amount, 2, '.', '' ),
+			    'tax_amount'   => number_format( $line_item_tax, 2, '.', '' ),
+			    'tax_rate_id'  => get_option( self::OPTION_LINE_ITEM_TAX_ID, ThinkingLogicWCSage::DEFAULT_TAX_ID ),
+			    'description'  => $description,
 		    ];
-
-		    return $line_item;
-	    }
-
-	    private function calculateLineItemAmount( $order, $item, $invoice_amount ) {
-	    	if ( $order->get_total() == 0 ) {
-	    		return 0;
-		    }
-		    return $item->get_total() * ( $invoice_amount / $order->get_total() );
 	    }
 
 	    /**

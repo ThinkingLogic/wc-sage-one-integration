@@ -23,6 +23,7 @@ Filters that can be hooked into:
 ```$php
  /**
   * Filters the invoice dates & amounts for the given order.
+  * For each element in the array one invoice will be created, with all amounts multiplied by ( invoice_amount / order total ).
   *
   * @param      array     $invoice_amounts  Associative array [invoice_date => invoice_amount], where invoice_date is in the format 'd/m/Y'.
   * @param      WC_Order  $order            The order
