@@ -1,7 +1,7 @@
 <?php
 /*
  * Plugin Name:       ThinkingLogic WooCommerce / Sage One Integration
- * Plugin URI:        http:/github.com/ThinkingLogic/wc-sage-one-integration
+ * Plugin URI:        https://github.com/ThinkingLogic/wc-sage-one-integration
  * Description:       An integration with the Sage One api (v3.1) for WooCommerce - allowing orders to be turned into Sage One invoices at the click of a button (per order). One invoice will be created per order per month. Each invoice will be allocated a fraction of the total cost of the order, according to how many lessons occur in that month.
  * Version:           0.2
  * Text Domain:       tl-wc-sage-one-integration
@@ -102,25 +102,24 @@ function tl_wc_sage_order_actions( $order_id ) {
 		$sage = ThinkingLogicWCSage::sageClient();
 		echo '<li class="wide">';
 		echo '   <div id="tl_wc_sage_order_actions" style="text-align: center;">';
-		if ($sage->isRefreshTokenExpiringSoon()) {
+		if ( $sage->isRefreshTokenExpiringSoon() ) {
 			echo '<a class="button" href="' . $sage->authorizationEndpoint() .'">Refresh Authorisation for Sage</a>';
-        } else {
-			if ($order->meta_exists(self::ORDER_FIELD_CUSTOMER_ID)) {
-				echo '       <input type="submit"';
-				echo '           class="button button-primary tl_wc_sage_order tl_wc_sage_customer_exists "';
-				echo '           name="' . ThinkingLogicWCSage::CREATE_INVOICE_BUTTON_ID . '"';
-				echo '           value="(Re)create Sage Invoice(s)"/>';
+        	} else {
+			if ( $order->meta_exists(ThinkingLogicWCSage::ORDER_FIELD_CUSTOMER_ID) ) {
+				echo '<input type="submit"
+					class="button button-primary tl_wc_sage_order tl_wc_sage_customer_exists "
+					name="' . ThinkingLogicWCSage::CREATE_INVOICE_BUTTON_ID . '"
+					value="(Re)create Sage Invoice(s)"/>';
 			} else {
-				echo '       <input type="submit"';
-				echo '           class="button button-primary tl_wc_sage_order "';
-				echo '           name="' . ThinkingLogicWCSage::CREATE_INVOICE_BUTTON_ID . '"';
-				echo '           value="Create Sage Invoice(s)"/>';
+				echo '<input type="submit"
+					class="button button-primary tl_wc_sage_order "
+					name="' . ThinkingLogicWCSage::CREATE_INVOICE_BUTTON_ID . '"
+					value="Create Sage Invoice(s)"/>';
 			}
-        }
+        	}
 		echo '   </div>';
 		echo '</li>';
 	}
-
 }
 
 /**
