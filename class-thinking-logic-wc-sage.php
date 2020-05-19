@@ -301,7 +301,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
             if (count($invoices) > 0) {
                 $message = 'Created SageOne invoices for the following dates and amounts: ';
                 foreach ($invoices as $date_string => $invoice) {
-                    $message .= ' <br/>&nbsp;&nbsp;' . $date_string . ', £' . $invoice_amounts[$date_string] . ' => <a href="' . self::SAGEONE_UI_URL_BASE . '/invoicing/sales_invoices/' . $invoice->id . '">' . $invoice->invoice_number . '</a>';
+                    $message .= ' <br/>&nbsp;&nbsp;' . $date_string . ', ' . $order->get_currency() . $invoice_amounts[$date_string] . ' => <a href="' . self::SAGEONE_UI_URL_BASE . '/invoicing/sales_invoices/' . $invoice->id . '">' . $invoice->invoice_number . '</a>';
                 }
                 $message .= "<br/>Invoice reference is '" . $this->invoiceReference($order) . "'";
                 $order->add_order_note($message);
