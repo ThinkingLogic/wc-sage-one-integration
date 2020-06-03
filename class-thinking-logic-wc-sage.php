@@ -15,26 +15,26 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
         const OPTION_CLIENT_SECRET             = 'tl_wc_sage_client_secret';
         const OPTION_ACCESS_TOKEN              = 'tl_wc_sage_access_token';
         const OPTION_ACCESS_TOKEN_EXPIRES      = 'tl_wc_sage_access_token_expires';
-	    const OPTION_REFRESH_TOKEN             = 'tl_wc_sage_refresh_token';
-	    const OPTION_REFRESH_TOKEN_EXPIRES     = 'tl_wc_sage_refresh_token_expires';
-	    const OPTION_REFRESH_TOKEN_EXPIRES_AT  = 'tl_wc_sage_refresh_token_expires_at';
-	    const OPTION_CALLBACK_URL              = 'tl_wc_sage_callback_url';
+	const OPTION_REFRESH_TOKEN             = 'tl_wc_sage_refresh_token';
+	const OPTION_REFRESH_TOKEN_EXPIRES     = 'tl_wc_sage_refresh_token_expires';
+	const OPTION_REFRESH_TOKEN_EXPIRES_AT  = 'tl_wc_sage_refresh_token_expires_at';
+	const OPTION_CALLBACK_URL              = 'tl_wc_sage_callback_url';
         const OPTION_SHIPPING_TAX_ID           = 'tl_wc_sage_shipping_tax_id';
-	    const OPTION_LINE_ITEM_TAX_ID          = 'tl_wc_sage_line_item_tax_id';
-	    const OPTION_LEDGER_CODES              = 'tl_wc_sage_ledger_codes';
+	const OPTION_LINE_ITEM_TAX_ID          = 'tl_wc_sage_line_item_tax_id';
+	const OPTION_LEDGER_CODES              = 'tl_wc_sage_ledger_codes';
 
-	    const FILTER_INVOICE_DATES             = 'tl_wc_sage_filter_invoice_dates';
-	    const FILTER_CUSTOMER                  = 'tl_wc_sage_filter_create_customer';
-	    const FILTER_INVOICE                   = 'tl_wc_sage_filter_create_invoice';
+	const FILTER_INVOICE_DATES             = 'tl_wc_sage_filter_invoice_dates';
+	const FILTER_CUSTOMER                  = 'tl_wc_sage_filter_create_customer';
+	const FILTER_INVOICE                   = 'tl_wc_sage_filter_create_invoice';
 
-	    const PRODUCT_FIELD_LEDGER_CODE        = '_tl_wc_sage_ledger_code';
-	    const ORDER_FIELD_CUSTOMER_ID          = '_tl_wc_sage_customer_id';
-	    const ORDER_FIELD_CUSTOMER_LINK        = '_tl_wc_sage_customer_link';
-	    const SAGEONE_UI_URL_BASE              = 'https://accounts-extra.sageone.com';
+	const PRODUCT_FIELD_LEDGER_CODE        = '_tl_wc_sage_ledger_code';
+	const ORDER_FIELD_CUSTOMER_ID          = '_tl_wc_sage_customer_id';
+	const ORDER_FIELD_CUSTOMER_LINK        = '_tl_wc_sage_customer_link';
+	const SAGEONE_UI_URL_BASE              = 'https://accounts-extra.sageone.com';
 
-	    const DEFAULT_TAX_ID                   = 'GB_ZERO';
-	    const DATE_TIME_FORMAT                 = 'd/m/Y H:i:s';
-	    const DATE_FORMAT                      = 'd/m/Y';
+	const DEFAULT_TAX_ID                   = 'GB_ZERO';
+	const DATE_TIME_FORMAT                 = 'd/m/Y H:i:s';
+	const DATE_FORMAT                      = 'd/m/Y';
         const CREATE_INVOICE_BUTTON_ID         = 'tl_wc_sage_create_invoice';
         const CALLBACK_REQUEST_PATH            = '/tl-wc-sage-plugin-callback';
         const CUSTOMER_TYPE_ID                 = 'CUSTOMER';
@@ -265,6 +265,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		        'contact_type_ids' => [ self::CUSTOMER_TYPE_ID ],
 		        'email' => $email,
 		        'notes' => 'Created from ' . $_SERVER['HTTP_HOST'] . ' order #' . $order->get_id(),
+			'currency_id' => $order->get_currency(),
 		        'main_contact_person' => [
 					'contact_person_type_ids' => [ self::CONTACT_PERSON_TYPE_ID ],
 					'name' => $name,
@@ -409,19 +410,20 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
         	$invoice_fraction = $this->calculateInvoiceFraction( $order, $invoice_amount);
         	$shipping_net = ( floatval ( $order->get_shipping_total() ) - floatval ( $order->get_shipping_tax() ) ) * $invoice_fraction;
 	        $sales_invoice = [
-	            'contact_id'           => $customer->id,
-	            'date'                 => $invoice_date,
-	            'contact_name'         => $customer->displayed_as,
-	            'due_date'             => $invoice_date,
-	            'reference'            => $this->invoiceReference($order),
-	            'notes'                => $this->getSalesInvoiceNotes( $order ),
-	            'shipping_net_amount'  => number_format( $shipping_net, 2, '.', '' ),
-	            'shipping_tax_rate_id' => get_option(ThinkingLogicWCSage::OPTION_SHIPPING_TAX_ID, ThinkingLogicWCSage::DEFAULT_TAX_ID ),
-		        'main_address'         => [ // sage requires an invoice address :(
-		        	'address_type_id' => ThinkingLogicWCSage::ADDRESS_TYPE_ID,
-			        'address_line_1' => 'N/A'
-		        ],
-	        ];
+			'contact_id'           => $customer->id,
+			'date'                 => $invoice_date,
+			'contact_name'         => $customer->displayed_as,
+			'due_date'             => $invoice_date,
+			'reference'            => $this->invoiceReference($order),
+			'notes'                => $this->getSalesInvoiceNotes( $order ),
+			'shipping_net_amount'  => number_format( $shipping_net, 2, '.', '' ),
+			'currency_id'          => $order->get_currency(),
+			'shipping_tax_rate_id' => get_option(ThinkingLogicWCSage::OPTION_SHIPPING_TAX_ID, ThinkingLogicWCSage::DEFAULT_TAX_ID ),
+			'main_address'         => [ // sage requires an invoice address :(
+				'address_type_id' => ThinkingLogicWCSage::ADDRESS_TYPE_ID,
+				'address_line_1' => 'N/A'
+			],
+		];
 	        $line_items = array();
 	        $order_items = $order->get_items();
 	        foreach ( $order_items as $item ) {
