@@ -399,6 +399,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 
         /**
          * Creates an invoice in SageOne.
+         * See also: https://developer.columbus.sage.com/docs#/uki/sageone/accounts/v3/sales_invoices_sales_invoice
          *
          * @param      WC_Order  $order           The order
          * @param      object    $customer        The customer
@@ -420,8 +421,8 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 			'currency_id'          => $order->get_currency(),
 			'shipping_tax_rate_id' => get_option(ThinkingLogicWCSage::OPTION_SHIPPING_TAX_ID, ThinkingLogicWCSage::DEFAULT_TAX_ID ),
 			'main_address'         => [ // sage requires an invoice address :(
-				'address_type_id' => ThinkingLogicWCSage::ADDRESS_TYPE_ID,
-				'address_line_1' => 'N/A'
+				'address_type_id'  => ThinkingLogicWCSage::ADDRESS_TYPE_ID,
+				'address_line_1'   => 'N/A'
 			],
 		];
 	        $line_items = array();
@@ -455,12 +456,12 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 	    }
 
 	    /**
-	     * @param      WC_Order_Item    $item        The item
+	     * @param      WC_Order_Item    $item        The line item
 	     * @param      float            $invoice_fraction the fraction of the order value accounted for by this invoice.
 	     *
-	     * @return array
+	     * @return array the line item as defined by https://developer.columbus.sage.com/docs#/uki/sageone/accounts/v3/sales_invoices_sales_invoice_invoice_lines
 	     */
-	    private function getSalesInvoiceLineItem( $item, $invoice_fraction ) {
+	    private function getSalesInvoiceLineItem( $item, $invoice_fraction ): array {
 		    $line_item_amount = $item->get_total() * $invoice_fraction;
 		    $line_item_tax = $item->get_total_tax() * $invoice_fraction;
 		    $description = $this->getLineItemDetail( $item );
@@ -469,7 +470,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 			    'ledger_account_id' => $this->getLedgerId( $item ),
 			    'quantity' => $item->get_quantity(),
 			    'unit_price' => number_format( $line_item_amount / $item->get_quantity(), 2, '.', '' ),
-			    'unit_price_includes_tax' => 'true',
+			    'unit_price_includes_tax' => 'false',
 			    'total_amount' => number_format( $line_item_amount, 2, '.', '' ),
 			    'tax_amount'   => number_format( $line_item_tax, 2, '.', '' ),
 			    'tax_rate_id'  => get_option( self::OPTION_LINE_ITEM_TAX_ID, ThinkingLogicWCSage::DEFAULT_TAX_ID ),

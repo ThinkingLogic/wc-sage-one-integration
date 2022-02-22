@@ -38,7 +38,7 @@ Filters that can be hooked into:
   *
   * @param      array     $contact          Associative array representing the json object sent to sage when creating the contact.
   * @param      WC_Order  $order            The order
-  * @return     array     $invoice_amounts  Associative array representing the json object sent to sage when creating the contact.
+  * @return     array     $invoice_amounts  Associative array [invoice_date => invoice_amount], where invoice_date is in the format 'd/m/Y'.
   */
 ``` 
  
@@ -47,9 +47,9 @@ Filters that can be hooked into:
  /**
   * Filters the fields passed to Sage when creating a sales invoice.
   *
-  * @param      array     $contact          Associative array representing the json object sent to sage when creating the contact.
+  * @param      array     $sales_invoice    See https://developer.columbus.sage.com/docs#/uki/sageone/accounts/v3/sales_invoices_sales_invoice
   * @param      WC_Order  $order            The order
-  * @return     array     $invoice_amounts  Associative array representing the json object sent to sage when creating the contact.
+  * @return     array     $sales_invoice    See https://developer.columbus.sage.com/docs#/uki/sageone/accounts/v3/sales_invoices_sales_invoice.
   */
 ``` 
  
