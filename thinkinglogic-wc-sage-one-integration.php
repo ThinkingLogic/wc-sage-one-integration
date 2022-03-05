@@ -103,9 +103,9 @@ function tl_wc_sage_order_actions( $order_id ) {
 		echo '<li class="wide">';
 		echo '   <div id="tl_wc_sage_order_actions" style="text-align: center;">';
 		if ( $sage->isRefreshTokenExpiringSoon() ) {
-			echo '<a class="button" href="' . $sage->authorizationEndpoint() .'">Refresh Authorisation for Sage</a>';
-        	} else {
-			if ( $order->meta_exists(ThinkingLogicWCSage::ORDER_FIELD_CUSTOMER_ID) ) {
+			echo '<a class="button" href="' . $sage->authorizationEndpoint() . '">Refresh Authorisation for Sage</a>';
+		} else {
+			if ( $order->meta_exists( ThinkingLogicWCSage::ORDER_FIELD_CUSTOMER_ID ) ) {
 				echo '<input type="submit"
 					class="button button-primary tl_wc_sage_order tl_wc_sage_customer_exists "
 					name="' . ThinkingLogicWCSage::CREATE_INVOICE_BUTTON_ID . '"
@@ -116,7 +116,7 @@ function tl_wc_sage_order_actions( $order_id ) {
 					name="' . ThinkingLogicWCSage::CREATE_INVOICE_BUTTON_ID . '"
 					value="Create Sage Invoice(s)"/>';
 			}
-        	}
+		}
 		echo '   </div>';
 		echo '</li>';
 	}
