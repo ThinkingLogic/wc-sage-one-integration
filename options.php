@@ -119,8 +119,8 @@ $test_url = substr($test_url, 0, strpos($test_url, '?')) . '?page=tl-wc-sage-plu
             </td>
             </tr>
             <tr valign="top">
-            <th scope="row">(Advanced)</th>
-            <td><input type="text" name="_tl_test_endpoint" id="_tl_test_endpoint"/><a class="button" id="tl_test_endpoint_button" onclick="testEndpoint()">Test this endpoint</a></td>
+            <th scope="row">(Advanced) get Sage data</th>
+            <td><input type="text" name="_tl_test_endpoint" id="_tl_test_endpoint"/><a class="button" id="tl_test_endpoint_button" onclick="testEndpoint()">Test this endpoint</a> (e.g. /journals). See <a href="https://developer.sage.com/api/accounting/api/">https://developer.sage.com/api/accounting/api/</a></td>
             </tr>
         <?php } ?>
  
@@ -131,8 +131,8 @@ $test_url = substr($test_url, 0, strpos($test_url, '?')) . '?page=tl-wc-sage-plu
 
         <?php if($response) { ?>
             <tr valign="top">
-            <th scope="row">Response from Sage</th>
-            <td><pre><?php $pretty_json = json_encode($response->getJSON(), JSON_PRETTY_PRINT); echo $pretty_json; ?></pre>
+            <th scope="row">Response from Sage:</th>
+            <td><?php echo $test_endpoint ?><br/><pre><?php $pretty_json = json_encode($response->getJSON(), JSON_PRETTY_PRINT); echo $pretty_json; ?></pre>
             </td>
             </tr>
 
