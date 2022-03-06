@@ -4,6 +4,7 @@ namespace ThinkingLogic;
 
 use GuzzleHttp\Psr7\Response;
 use League\OAuth2\Client\Token\AccessTokenInterface;
+use SageAccounting\ApiResponse;
 
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/AccessTokenStore.php';
@@ -57,7 +58,7 @@ class SageApiClient {
 	 * Returns the authorization endpoint with all required query params for
 	 * making the auth request
 	 */
-	public function authorizationEndpoint() {
+	public function authorizationEndpoint(): string {
 		return self::AUTH_ENDPOINT . "&response_type=code&client_id=" .
 		       $this->clientId . "&redirect_uri=" . urlencode( $this->callbackUrl ) .
 		       "&scope=" . self::SCOPE . "&state=" . $this->generatedState;
@@ -143,9 +144,9 @@ class SageApiClient {
 	 * @param $httpMethod
 	 * @param null $postData
 	 *
-	 * @return \SageAccounting\ApiResponse
+	 * @return ApiResponse
 	 */
-	public function execApiRequest( $resource, $httpMethod, $postData = null ) {
+	public function execApiRequest( $resource, $httpMethod, $postData = null ): ApiResponse {
 		$this->refreshTokenIfNecessary();
 		$method                             = strtoupper( $httpMethod );
 		$options['headers']['Content-Type'] = 'application/json';
@@ -172,7 +173,7 @@ class SageApiClient {
 			Logger::addAdminWarning( $e->getMessage() );
 		} finally {
 			$endTime      = microtime( 1 );
-			$api_response = new \SageAccounting\ApiResponse( $requestResponse, $endTime - $startTime );
+			$api_response = new ApiResponse( $requestResponse, $endTime - $startTime );
 			Logger::debug( 'Made ' . $httpMethod . ' request to ' . $resource . ' with request body=' . $postData . ', response: ' . $api_response->getBody() );
 
 			return $api_response;
@@ -210,13 +211,13 @@ class SageApiClient {
 	/**
 	 * @return true if the refresh token will expire within the next hour
 	 */
-	public function isRefreshTokenExpiringSoon() {
+	public function isRefreshTokenExpiringSoon(): bool {
 		$expires_at = $this->getRefreshTokenExpiresAt();
 
 		return empty( $expires_at ) || $expires_at < ( time() + ( 60 * 60 ) );
 	}
 
-	public function getAccessTokenStore() {
+	public function getAccessTokenStore(): ?AccessTokenStore {
 		if ( $this->accessTokenStore ) {
 			return $this->accessTokenStore;
 		}
@@ -231,7 +232,7 @@ class SageApiClient {
 
 	// Private area
 
-	private function storeAccessToken( AccessTokenInterface $response ) {
+	private function storeAccessToken( AccessTokenInterface $response ): AccessTokenInterface {
 		if ( ! $this->accessTokenStore ) {
 			$this->accessTokenStore = new AccessTokenStore();
 		}

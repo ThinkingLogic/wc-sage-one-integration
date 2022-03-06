@@ -13,9 +13,9 @@ class Logger {
 	/**
 	 * Adds an admin notice to be displayed to the user.
 	 *
-	 * @param <type> $message The message
+	 * @param string $message The message
 	 */
-	public static function addAdminNotice( $message ) {
+	public static function addAdminNotice( string $message ) {
 		self::log( $message );
 		self::addCustomNotice( $message );
 	}
@@ -25,7 +25,7 @@ class Logger {
 	 *
 	 * @param string $message The message
 	 */
-	public static function addAdminWarning( $message ) {
+	public static function addAdminWarning( string $message ) {
 		self::log( 'WARN: ' . $message );
 		self::addCustomNotice( '<span style="color: red; font-weight: bold">' . $message . '</span>' );
 	}
@@ -60,7 +60,7 @@ class Logger {
 	 *
 	 * @param string $message The message
 	 */
-	public static function debug( $message ) {
+	public static function debug( string $message ) {
 		if ( self::isDebugging() ) {
 			self::log( $message );
 		}
@@ -71,7 +71,7 @@ class Logger {
 	 *
 	 * @param string $message The message
 	 */
-	public static function log( $message ) {
+	public static function log( string $message ) {
 		if ( constant( 'WP_DEBUG' ) && constant( 'WP_DEBUG_LOG' ) ) {
 			error_log( "ThinkingLogicWCSage: " . $message );
 		}
@@ -82,7 +82,7 @@ class Logger {
 	 *
 	 * @param string $message The message
 	 */
-	private static function addCustomNotice( $message ) {
+	private static function addCustomNotice( string $message ) {
 		self::loadMessages();
 		self::$_messages .= '<p>' . $message . '</p>';
 		update_option( self::OPTION_CUSTOM_NOTICES, self::$_messages );
@@ -96,7 +96,7 @@ class Logger {
 		return self::$_messages;
 	}
 
-	private static function isDebugging() {
+	private static function isDebugging(): bool {
 		if ( empty( self::$_log_debug ) ) {
 			self::$_log_debug = get_option( self::OPTION_LOG_DEBUG, 'false' );
 		}

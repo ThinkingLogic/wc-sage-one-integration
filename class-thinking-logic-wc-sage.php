@@ -1,5 +1,6 @@
 <?php
 
+use SageAccounting\ApiResponse;
 use ThinkingLogic\SageApiClient;
 use ThinkingLogic\Logger;
 
@@ -33,12 +34,13 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		const PRODUCT_FIELD_ACCRUALS_LEDGER_CODE = '_tl_wc_sage_accruals_ledger_code';
 		const ORDER_FIELD_CUSTOMER_ID = '_tl_wc_sage_customer_id';
 		const ORDER_FIELD_CUSTOMER_LINK = '_tl_wc_sage_customer_link';
-		const ORDER_FIELD_LATEST_INVOICE_DATE = '_tl_wc_sage_latest_invoice_date';
+		const ORDER_FIELD_LATEST_INVOICE_DATE = '_tl_wc_sage_latest_invoice_date'; // in DATE_FORMAT format
 		const SAGEONE_UI_URL_BASE = 'https://accounts-extra.sageone.com';
 
 		const DEFAULT_TAX_ID = 'GB_ZERO';
 		const DATE_TIME_FORMAT = 'd/m/Y H:i:s';
 		const DATE_FORMAT = 'd/m/Y';
+		const SAGE_DATE_FORMAT = 'Y-m-d';
 		const CREATE_INVOICE_BUTTON_ID = 'tl_wc_sage_create_invoice';
 		const CALLBACK_REQUEST_PATH = '/tl-wc-sage-plugin-callback';
 		const CUSTOMER_TYPE_ID = 'CUSTOMER';
@@ -53,7 +55,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @return     ThinkingLogicWCSage
 		 */
-		public static function instance() {
+		public static function instance(): ?ThinkingLogicWCSage {
 			if ( is_null( self::$_instance ) ) {
 				self::$_instance = new ThinkingLogicWCSage();
 			}
@@ -83,7 +85,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @return     boolean  True if has client details, False otherwise.
 		 */
-		public static function hasClientDetails() {
+		public static function hasClientDetails(): bool {
 			$client_id     = get_option( self::OPTION_CLIENT_ID );
 			$client_secret = get_option( self::OPTION_CLIENT_SECRET );
 
@@ -95,7 +97,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @param string $order_id The order identifier
 		 */
-		public function handleCreateSageInvoices( $order_id ) {
+		public function handleCreateSageInvoices( string $order_id ) {
 			$order = wc_get_order( $order_id );
 
 			if ( ! $this->validateOrder( $order ) ) {
@@ -123,7 +125,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @return     boolean   true if the order is valid
 		 */
-		private function validateOrder( $order ) {
+		private function validateOrder( WC_Order $order ): bool {
 			$result = true;
 			foreach ( $order->get_items() as $item ) {
 				if ( ! $this->getSalesLedgerId( $item ) ) {
@@ -142,7 +144,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @return     mixed  The ledger identifier, or null if none exists for the product.
 		 */
-		public function getSalesLedgerId( $item ) {
+		public function getSalesLedgerId( WC_Order_Item $item ) {
 			return $this->getProductLedgerId( $item, self::PRODUCT_FIELD_LEDGER_CODE, null );
 		}
 
@@ -154,33 +156,33 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @return     mixed  The ledger identifier, or the default if none exists for the product.
 		 */
-		public function getAccrualsLedgerId( $item ) {
-			$id = get_option( self::OPTION_DEFAULT_ACCRUALS_LEDGER_CODE );
-			return $this->getProductLedgerId( $item, self::PRODUCT_FIELD_ACCRUALS_LEDGER_CODE, $id );
+		public function getAccrualsLedgerId( WC_Order_Item $item ) {
+			$code = get_option( self::OPTION_DEFAULT_ACCRUALS_LEDGER_CODE );
+
+			return $this->getProductLedgerId( $item, self::PRODUCT_FIELD_ACCRUALS_LEDGER_CODE, $code );
 		}
 
 		/**
 		 * Gets the desired ledger id for the product associated with the given item.
 		 *
 		 * @param WC_Order_Item $item The item
-		 * @param $metadata_key the metadata key holding the ledger code to look up.
-		 * @param $default_value
+		 * @param $metadata_key string the metadata key holding the ledger code to look up.
+		 * @param $default_code string the default ledger code to use if none specified on the product.
 		 *
-		 * @return mixed  The ledger identifier, or the default if none exists for the product.
+		 * @return mixed  The ledger identifier, or the id of the default code if none exists for the product.
 		 */
-		private function getProductLedgerId( $item, $metadata_key, $default_value ) {
-			$ledger_id = $default_value;
+		public function getProductLedgerId( WC_Order_Item $item, string $metadata_key, $default_code ) {
+			$code = $default_code;
 			$product   = wc_get_product( $item->get_product_id() );
 			if ( $product && $product->meta_exists( $metadata_key ) ) {
 				$code = $product->get_meta( $metadata_key );
-				$map  = $this->getLedgerCodeMap();
-				if ( ! array_key_exists( $code, $map ) ) {
-					$map = $this->getLedgerCodeMap( true );
-				}
-				$ledger_id = $map[ $code ];
+			}
+			$map  = $this->getLedgerCodeMap();
+			if ( $map == null || ! array_key_exists( $code, $map ) ) {
+				$map = $this->getLedgerCodeMap( true );
 			}
 
-			return $ledger_id;
+			return $map[ $code ];
 		}
 
 		/**
@@ -190,7 +192,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @return     array    an array of ledger codes and ids [code => id].
 		 */
-		private function getLedgerCodeMap( $refresh = false ) {
+		private function getLedgerCodeMap( bool $refresh = false ): ?array {
 			if ( $refresh ) {
 				$ledgers = $this->getAllItems( '/ledger_accounts?items_per_page=200&attributes=nominal_code' );
 				$map     = array();
@@ -210,16 +212,15 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @param      (optional) string  $email  The email address
 		 *
-		 * @return     \SageAccounting\ApiResponse
+		 * @return     ApiResponse
 		 */
-		public function listCustomers( $email = '' ) {
+		public function listCustomers( $email = '' ): ApiResponse {
 			$url = '/contacts?contact_type_id=' . self::CUSTOMER_TYPE_ID;
 			if ( $email ) {
 				$url .= '&email=' . urlencode( $email );
 			}
-			$response = $this->getData( $url );
 
-			return $response;
+			return $this->getData( $url );
 		}
 
 		/**
@@ -227,9 +228,9 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @param $url
 		 *
-		 * @return     \SageAccounting\ApiResponse
+		 * @return     ApiResponse
 		 */
-		public function makeGetRequest( $url ) {
+		public function makeGetRequest( $url ): ApiResponse {
 			return $this->getData( $url );
 		}
 
@@ -238,9 +239,9 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @param $url
 		 *
-		 * @return array of items
+		 * @return array of items containing items from all pages of the sage response
 		 */
-		public function getAllItems( $url ) {
+		public function getAllItems( $url ): array {
 			$api_response = $this->makeGetRequest( $url );
 			$json         = $api_response->getJSON();
 			$items        = $json->{'$items'};
@@ -273,7 +274,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 					Logger::addAdminWarning( $message );
 					$order->add_order_note( $message );
 				} else {
-					Logger::addAdminNotice( "Found existing SageOne customer #" . $customer->id );
+					Logger::addAdminNotice( "Found existing SageOne customer " . $customer->displayed_as );
 				}
 			} else {
 				$first_name   = $order->get_billing_first_name();
@@ -281,12 +282,12 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 				$phone        = $order->get_billing_phone();
 				$api_response = $this->createCustomer( $email, $first_name . ' ' . $last_name, $phone, $order );
 				$customer     = $api_response->getJSON();
-				Logger::addAdminNotice( "Created SageOne customer #" . $customer->id );
-				$order->add_order_note( "Created SageOne customer #" . $customer->id );
+				Logger::addAdminNotice( "Created SageOne customer " . $customer->displayed_as );
+				$order->add_order_note( 'Created SageOne customer '	. '<a href="' . self::SAGEONE_UI_URL_BASE . '/contacts/customers/' . $customer->id . '">' . $customer->displayed_as . '</a>' );
 			}
 			if ( ! $order->meta_exists( self::ORDER_FIELD_CUSTOMER_ID ) ) {
 				$order->update_meta_data( self::ORDER_FIELD_CUSTOMER_ID, $customer->id );
-				if ( sizeof( $customer->links ) > 0 && isset( $customer->links[0]->href ) ) {
+				if ( isset( $customer->links) && sizeof( $customer->links ) > 0 && isset( $customer->links[0]->href ) ) {
 					$order->update_meta_data( self::ORDER_FIELD_CUSTOMER_LINK, $customer->links[0]->href );
 				}
 				$order->save();
@@ -304,9 +305,9 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 * @param string $phone The phone
 		 * @param WC_Order $order The order
 		 *
-		 * @return     \SageAccounting\ApiResponse
+		 * @return     ApiResponse
 		 */
-		private function createCustomer( $email, $name, $phone, $order ) {
+		private function createCustomer( string $email, string $name, string $phone, WC_Order $order ): ApiResponse {
 			$contact = [
 				'name'                => $name,
 				'contact_type_ids'    => [ self::CUSTOMER_TYPE_ID ],
@@ -336,9 +337,10 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 * @param WC_Order $order The order
 		 * @param object $customer The customer
 		 * @param array $invoice_amounts Associative array [invoice_date => invoice_amount], where invoice_date is in the format ::DATE_FORMAT.
-		 * @return array Associative array [invoice_date => invoice] containing the invoices created. See https://developer.sage.com/api/accounting/api/invoicing-sales/#operation/getSalesInvoicesKey.
+		 *
+		 * @return array Associative array [invoice_date => invoice] containing the invoices created, keyed by dates in ::DATE_FORMAT. See https://developer.sage.com/api/accounting/api/invoicing-sales/#operation/getSalesInvoicesKey.
 		 */
-		public function createInvoices( $order, $customer, $invoice_amounts ) {
+		public function createInvoices( WC_Order $order, $customer, array $invoice_amounts ): array {
 			$invoices          = array();
 			$existing_invoices = $this->listInvoices( $customer->id, $this->invoiceReference( $order ), array_keys( $invoice_amounts ) );
 			foreach ( $invoice_amounts as $date_string => $invoice_amount ) {
@@ -348,10 +350,10 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 				}
 			}
 			if ( count( $invoices ) > 0 ) {
-				$message = 'Created SageOne invoices for the following dates and amounts: ';
+				$message             = 'Created SageOne invoices for the following dates and amounts: ';
 				$latest_invoice_date = null;
 				foreach ( $invoices as $date_string => $invoice ) {
-					$message .= ' <br/>&nbsp;&nbsp;' . $date_string . ', ' . $order->get_currency() . $invoice_amounts[ $date_string ] . ' => <a href="' . self::SAGEONE_UI_URL_BASE . '/invoicing/sales_invoices/' . $invoice->id . '">' . $invoice->invoice_number . '</a>';
+					$message             .= ' <br/>&nbsp;&nbsp;' . $date_string . ', ' . $order->get_currency() . $invoice_amounts[ $date_string ] . ' => <a href="' . self::SAGEONE_UI_URL_BASE . '/invoicing/sales_invoices/' . $invoice->id . '">' . $invoice->invoice_number . '</a>';
 					$latest_invoice_date = $date_string;
 				}
 				$message .= "<br/>Invoice reference is '" . $this->invoiceReference( $order ) . "'";
@@ -363,6 +365,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 			if ( $invoice_sum != $order->get_total() ) {
 				Logger::addAdminWarning( 'Sum of invoice amounts: ' . $invoice_sum . ' does not equal order total: ' . $order->get_total() . '. Manual correction required.' );
 			}
+
 			return $invoices;
 		}
 
@@ -372,20 +375,20 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 * @param WC_Order $order The order
 		 * @param array $journal_entries An array of journal entries as defined by sage: https://developer.sage.com/api/accounting/api/accounting/#tag/Journals
 		 */
-		public function createJournalEntries( $order, $journal_entries ) {
+		public function createJournalEntries( WC_Order $order, array $journal_entries ) {
 			if ( count( $journal_entries ) > 0 ) {
 				$message = '';
 				foreach ( $journal_entries as $journal ) {
-					$response = $this->postData( '/sales_invoices', [ 'journal' => $journal ] )->getJSON();
+					$response = $this->postData( '/journals', [ 'journal' => $journal ] )->getJSON();
 					if ( is_object( $response ) && property_exists( $response, 'id' ) ) {
 						$message .= ' <br/>&nbsp;&nbsp;' . $response->date
 						            . ': <a href="' . self::SAGEONE_UI_URL_BASE . '/journals#' . $response->id . '">'
-						            . $response->displayed_as . ' (' . $response->total . $order->get_currency() . ' ' . $response->description . ')</a>';
+						            . $response->displayed_as . ' (' . $response->total . $order->get_currency() . ')</a>';
 					} else {
 						Logger::addAdminWarning( 'Unable to create journal entry ' . json_encode( $journal ) . ' : ' . json_encode( $response ) );
 					}
 				}
-				if ( strlen($message) > 0) {
+				if ( strlen( $message ) > 0 ) {
 					$message = 'Created SageOne journal entries: ' . $message;
 					$order->add_order_note( $message );
 					Logger::addAdminNotice( $message );
@@ -395,12 +398,50 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		}
 
 		/**
+		 * Constructs an associative array representing a journal entry in the format accepted by Sage:
+		 * https://developer.sage.com/api/accounting/api/accounting/#operation/postJournals
+		 *
+		 * @param $journal_date string the date of the journal, in ::SAGE_DATE_FORMAT.
+		 * @param $reference string the reference for the journal.
+		 * @param $description string a description. Used as both the description of the journal and the 'details' of each line.
+		 * @param $ledger_from string the id of the ledger to debit.
+		 * @param $ledger_to string the id of the ledger to credit.
+		 * @param $amount numeric the amount of the journal entry.
+		 *
+		 * @return array the new journal ready to be POSTed to Sage.
+		 */
+		public function constructJournalEntry( string $journal_date, string $reference, string $description, string $ledger_from, string $ledger_to, $amount ): array {
+			$journal                  = [
+				'date'        => $journal_date,
+				'reference'   => $reference,
+				'description' => $description,
+				'total'       => $amount,
+			];
+			$lines                    = array();
+			$lines[]                  = [
+				'ledger_account_id' => $ledger_from,
+				'debit'             => $amount,
+				'credit'            => 0,
+				'details'           => $description
+			];
+			$lines[]                  = [
+				'ledger_account_id' => $ledger_to,
+				'debit'             => 0,
+				'credit'            => $amount,
+				'details'           => $description
+			];
+			$journal['journal_lines'] = $lines;
+
+			return $journal;
+		}
+
+		/**
 		 * @param WC_Order $order The order
 		 *
-		 * @return     string    The invoice reference
+		 * @return     string    The invoice reference (the order id prefixed with a hash)
 		 */
-		private function invoiceReference( $order ) {
-			return $this->getPaypalOrderPrefix() . $order->get_id();
+		public function invoiceReference( WC_Order $order ): string {
+			return "#" . $order->get_id();
 		}
 
 		/**
@@ -409,15 +450,15 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @param string $customer_id The customer identifier
 		 * @param string $reference The reference - e.g. order id
-		 * @param array $dates - array of dates formatted as DATE_FORMAT.
+		 * @param array $dates - array of dates formatted as ::DATE_FORMAT.
 		 *
-		 * @return     array   existing invoices as returned by Sage, keyed by the invoice date.
+		 * @return     array   existing invoices as returned by Sage, keyed by the invoice date formatted as ::SAGE_DATE_FORMAT.
 		 */
-		private function listInvoices( $customer_id, $reference, $dates ) {
+		private function listInvoices( string $customer_id, string $reference, array $dates ): array {
 			// sort the invoice dates to get the first and last date
 			$formatted_dates = array();
 			foreach ( $dates as $date ) {
-				$formatted                     = DateTime::createFromFormat( self::DATE_FORMAT, $date )->format( 'Y-m-d' );
+				$formatted                     = $this->convertDateToSageFormat( $date );
 				$formatted_dates[ $formatted ] = $date;
 			}
 			ksort( $formatted_dates );
@@ -439,19 +480,20 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @param WC_Order $order The order
 		 * @param object $customer The customer
-		 * @param string $invoice_date The invoice date
+		 * @param string $invoice_date The invoice date in the format ::DATE_FORMAT
 		 * @param number $invoice_amount The invoice amount
-		 * @param array $existing_invoices array of existing invoices, keyed by date
+		 * @param array $existing_invoices array of existing invoices, keyed by date in ::SAGE_DATE_FORMAT
 		 *
 		 * @return     object the invoice that was created, or null if not created.
 		 */
-		private function maybeCreateInvoice( $order, $customer, $invoice_date, $invoice_amount, $existing_invoices ) {
+		private function maybeCreateInvoice( WC_Order $order, $customer, string $invoice_date, $invoice_amount, array $existing_invoices ) {
 			$result = null;
-			if ( array_key_exists( $invoice_date, $existing_invoices ) ) {
-				$message = 'Invoice for customer ' . $customer->id . ', order ' . $order->get_id() . ' and date ' . $invoice_date . ' already exists: ' . $existing_invoices[ $invoice_date ]->invoice_number;
+			$sage_invoice_date = $this->convertDateToSageFormat($invoice_date);
+			if ( array_key_exists( $sage_invoice_date, $existing_invoices ) ) {
+				$message = 'Invoice for customer ' . $customer->id . ', order ' . $order->get_id() . ' and date ' . $invoice_date . ' already exists: ' . $existing_invoices[ $sage_invoice_date ]->invoice_number;
 				Logger::addAdminWarning( $message );
 			} else {
-				$invoice = $this->createInvoice( $order, $customer, $invoice_date, $invoice_amount );
+				$invoice = $this->createInvoice( $order, $customer, $sage_invoice_date, $invoice_amount );
 				if ( is_object( $invoice ) && property_exists( $invoice, 'invoice_number' ) ) {
 					$result = $invoice;
 				} else {
@@ -468,9 +510,9 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 * @param object $invoices The invoices
 		 * @param string $reference Only invoices with this reference will be returned.
 		 *
-		 * @return     array   filtered invoices keyed by date: [date => invoice]
+		 * @return     array   filtered invoices keyed by date: [date => invoice] where date is formatted as ::SAGE_DATE_FORMAT.
 		 */
-		private function mapInvoicesByDate( $invoices, $reference ) {
+		private function mapInvoicesByDate( $invoices, string $reference ): array {
 			$map = array();
 			foreach ( $invoices as $index => $invoice ) {
 				if ( $invoice->reference == $reference ) {
@@ -486,13 +528,13 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 * See also: https://developer.columbus.sage.com/docs#/uki/sageone/accounts/v3/sales_invoices_sales_invoice
 		 *
 		 * @param WC_Order $order The order
-		 * @param object $customer The customer
-		 * @param string $invoice_date The invoice date
+		 * @param object $customer The customer as a Sage contact. https://developer.sage.com/api/accounting/api/contacts/#tag/Contacts.
+		 * @param string $invoice_date The invoice date in the format ::DATE_FORMAT
 		 * @param number $invoice_amount The invoice amount
 		 *
-		 * @return     object    the response from sage, as a json object.
+		 * @return     object    the response from sage, as a json object. https://developer.columbus.sage.com/docs#/uki/sageone/accounts/v3/sales_invoices_sales_invoice
 		 */
-		private function createInvoice( $order, $customer, $invoice_date, $invoice_amount ) {
+		private function createInvoice( WC_Order $order, $customer, string $invoice_date, $invoice_amount ) {
 			$invoice_fraction = $this->calculateInvoiceFraction( $order, $invoice_amount );
 			$shipping_net     = ( floatval( $order->get_shipping_total() ) - floatval( $order->get_shipping_tax() ) ) * $invoice_fraction;
 			$sales_invoice    = [
@@ -523,9 +565,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 			$sales_invoice = apply_filters( ThinkingLogicWCSage::FILTER_INVOICE, $sales_invoice, $order );
 			Logger::log( "createInvoice: after filter: " . json_encode( $sales_invoice ) );
 
-			$response = $this->postData( '/sales_invoices', [ 'sales_invoice' => $sales_invoice ] )->getJSON();
-
-			return $response;
+			return $this->postData( '/sales_invoices', [ 'sales_invoice' => $sales_invoice ] )->getJSON();
 		}
 
 		/**
@@ -548,7 +588,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @return array the line item as defined by https://developer.columbus.sage.com/docs#/uki/sageone/accounts/v3/sales_invoices_sales_invoice_invoice_lines
 		 */
-		private function getSalesInvoiceLineItem( $item, $invoice_fraction ): array {
+		private function getSalesInvoiceLineItem( WC_Order_Item $item, float $invoice_fraction ): array {
 			$line_item_amount = $item->get_total() * $invoice_fraction;
 			$line_item_tax    = $item->get_total_tax() * $invoice_fraction;
 			$description      = $this->getLineItemDetail( $item );
@@ -572,7 +612,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @return     string  The line item detail.
 		 */
-		private function getLineItemDetail( $item ) {
+		private function getLineItemDetail( WC_Order_item $item ): string {
 			$detail    = $item->get_name();
 			$meta_data = $item->get_meta_data();
 			foreach ( $meta_data as $meta ) {
@@ -591,21 +631,21 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @return     string  The paypal order prefix.
 		 */
-		private function getPaypalOrderPrefix() {
+		private function getPaypalOrderPrefix(): string {
 			$paypal_settings = get_option( 'woocommerce_paypal_settings' );
 
 			return $paypal_settings['invoice_prefix'];
 		}
 
 		/**
-		 * Makes a post request to to SageOne, refreshing the token if necessary and generating all required headers.
+		 * Makes a post request to SageOne, refreshing the token if necessary and generating all required headers.
 		 *
 		 * @param string $endpoint The endpoint, the portion after the BASE_ENDPOINT
-		 * @param string $postData Object representing the body of the post request
+		 * @param object $postData Object representing the body of the post request
 		 *
-		 * @return     \SageAccounting\ApiResponse
+		 * @return     ApiResponse
 		 */
-		private function postData( $endpoint, $postData ) {
+		private function postData( string $endpoint, $postData ): ApiResponse {
 			$client = self::sageClient();
 
 			return $client->execApiRequest( $endpoint, 'POST', json_encode( $postData ) );
@@ -616,20 +656,20 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @param string $endpoint The endpoint, the portion after the BASE_ENDPOINT
 		 *
-		 * @return     \SageAccounting\ApiResponse
+		 * @return     ApiResponse
 		 */
-		private function getData( $endpoint ) {
+		private function getData( string $endpoint ): ApiResponse {
 			$client = self::sageClient();
 
 			return $client->execApiRequest( $endpoint, 'GET' );
 		}
 
 		/**
-		 * @param $order
+		 * @param $order WC_Order
 		 *
 		 * @return string
 		 */
-		private function getSalesInvoiceNotes( $order ) {
+		private function getSalesInvoiceNotes( WC_Order $order ): string {
 			$notes  = 'WooCommerce order #' . $order->get_id() . ' (total ' . $order->get_total() . ' ' . $order->get_currency() . ')';
 			$notes  .= ", payment method=" . $order->get_payment_method();
 			$custom = get_post_custom( $order->get_id() );
@@ -644,6 +684,15 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 			}
 
 			return $notes;
+		}
+
+		/**
+		 * @param $date string formatted as ::DATE_FORMAT
+		 *
+		 * @return string the date formatted as ::SAGE_DATE_FORMAT
+		 */
+		private function convertDateToSageFormat( string $date ): string {
+			return DateTime::createFromFormat( self::DATE_FORMAT, $date )->format( self::SAGE_DATE_FORMAT );
 		}
 	}
 }
