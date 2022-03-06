@@ -53,3 +53,16 @@ Filters that can be hooked into:
   */
 ``` 
  
+**tl_wc_sage_filter_create_journals:**
+```$php
+ /**
+  * Filters the list of journal entries to be created in Sage.
+  *
+  * @param      array     $journal_entries  An initially empty array, to be populated with journals.
+  * @param      WC_Order  $order            The order. See https://woocommerce.github.io/code-reference/classes/WC-Order.html
+  * @param      array     $customer         The customer as they exist in Sage. See See https://developer.sage.com/api/accounting/api/contacts/#operation/getContactsKey.
+  * @param      array     $invoices         Associative array [invoice_date => invoice] containing the invoice(s) just created for this order. See https://developer.sage.com/api/accounting/api/invoicing-sales/#operation/getSalesInvoicesKey.
+  * @return     array     $journal_entries  Array of journals to create in Sage  See https://developer.columbus.sage.com/docs#/uki/sageone/accounts/v3/sales_invoices_sales_invoice.
+  */
+``` 
+ 

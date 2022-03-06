@@ -86,6 +86,7 @@ function tl_wc_sage_register_settings() { // whitelist options
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_SHIPPING_TAX_ID );
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_LINE_ITEM_TAX_ID );
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_LEDGER_CODES );
+	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, ThinkingLogicWCSage::OPTION_DEFAULT_ACCRUALS_LEDGER_CODE );
 
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, Logger::OPTION_CUSTOM_NOTICES );
 	register_setting( ThinkingLogicWCSage::OPTIONS_GROUP, Logger::OPTION_LOG_DEBUG );
@@ -154,22 +155,31 @@ function tl_wc_sage_order_customer_link( $order ) {
 }
 
 /**
- * Adds a ledger id field to products.
+ * Adds sales and accruals ledger id fields to products.
  */
 function tl_wc_sage_show_product_fields() {
 	woocommerce_wp_text_input(
 		array(
 			'id'          => ThinkingLogicWCSage::PRODUCT_FIELD_LEDGER_CODE,
-			'label'       => 'SageOne Ledger code',
+			'label'       => 'Sales Ledger code',
 			'desc_tip'    => 'true',
 			'description' => 'The code of the Ledger that purchases of this product should be assigned to in SageOne.',
+		)
+	);
+
+	woocommerce_wp_text_input(
+		array(
+			'id'          => ThinkingLogicWCSage::PRODUCT_FIELD_ACCRUALS_LEDGER_CODE,
+			'label'       => 'Accruals Ledger code',
+			'desc_tip'    => 'true',
+			'description' => 'The code of the Ledger that monies should be journalled to until redeemed. Only needed if different to the default accruals ledger code.',
 		)
 	);
 
 }
 
 /**
- * Saves the ledger code field on product save.
+ * Saves the ledger code fields on product save.
  *
  * @param <type> $post_id The post identifier
  */
@@ -177,6 +187,10 @@ function tl_wc_sage_save_product_fields( $post_id ) {
 	$ledger_code = $_POST[ ThinkingLogicWCSage::PRODUCT_FIELD_LEDGER_CODE ];
 	if ( ! empty( $ledger_code ) ) {
 		update_post_meta( $post_id, ThinkingLogicWCSage::PRODUCT_FIELD_LEDGER_CODE, esc_html( $ledger_code ) );
+	}
+	$accruals_code = $_POST[ ThinkingLogicWCSage::PRODUCT_FIELD_ACCRUALS_LEDGER_CODE ];
+	if ( ! empty( $accruals_code ) ) {
+		update_post_meta( $post_id, ThinkingLogicWCSage::PRODUCT_FIELD_ACCRUALS_LEDGER_CODE, esc_html( $accruals_code ) );
 	}
 }
 

@@ -49,13 +49,13 @@ $test_url = substr( $test_url, 0, strpos( $test_url, '?' ) ) . '?page=tl-wc-sage
         </p>
 
         <table class="form-table">
-            <tr valign="top">
+            <tr style="vertical-align: top">
                 <th scope="row">Client ID</th>
                 <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_CLIENT_ID ?>"
                            value="<?php echo esc_attr( get_option( ThinkingLogicWCSage::OPTION_CLIENT_ID ) ); ?>"/></td>
             </tr>
 
-            <tr valign="top">
+            <tr style="vertical-align: top">
                 <th scope="row">Client Secret</th>
                 <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_CLIENT_SECRET ?>"
                            value="<?php echo esc_attr( get_option( ThinkingLogicWCSage::OPTION_CLIENT_SECRET ) ); ?>"/>
@@ -63,7 +63,7 @@ $test_url = substr( $test_url, 0, strpos( $test_url, '?' ) ) . '?page=tl-wc-sage
             </tr>
 
 			<?php if ( $sageone_client ) { ?>
-                <tr valign="top">
+                <tr style="vertical-align: top">
                     <th scope="row">Shipping Tax Rate id</th>
                     <td>
                         <input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_SHIPPING_TAX_ID ?>"
@@ -72,7 +72,7 @@ $test_url = substr( $test_url, 0, strpos( $test_url, '?' ) ) . '?page=tl-wc-sage
                     </td>
                 </tr>
 
-                <tr valign="top">
+                <tr style="vertical-align: top">
                     <th scope="row">Line item Tax Rate id</th>
                     <td>
                         <input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_LINE_ITEM_TAX_ID ?>"
@@ -80,7 +80,18 @@ $test_url = substr( $test_url, 0, strpos( $test_url, '?' ) ) . '?page=tl-wc-sage
                     </td>
                 </tr>
 
-                <tr valign="top">
+                <tr style="vertical-align: top">
+                    <th scope="row">Default Accruals ledger code</th>
+                    <td>
+                        <input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_DEFAULT_ACCRUALS_LEDGER_CODE ?>"
+                               value="<?php echo esc_attr( get_option( ThinkingLogicWCSage::OPTION_DEFAULT_ACCRUALS_LEDGER_CODE, '2109' ) ); ?>"/>
+                        <a class="button"
+                           href="<?php echo $test_url ?>&test_endpoint=/ledger_accounts<?php echo urlencode( '?items_per_page=200&attributes=nominal_code' ) ?>">List
+                            Ledger accounts</a>
+                    </td>
+                </tr>
+
+                <tr style="vertical-align: top">
                     <th scope="row">Log API request/responses</th>
                     <td>
                         <input type="text" name="<?php echo Logger::OPTION_LOG_DEBUG ?>"
@@ -90,7 +101,7 @@ $test_url = substr( $test_url, 0, strpos( $test_url, '?' ) ) . '?page=tl-wc-sage
                     </td>
                 </tr>
 
-                <tr valign="top">
+                <tr style="vertical-align: top">
                     <th scope="row">Access Token</th>
                     <td>To obtain a refresh token and an access token, you must authenticate with Sage One and authorise
                         this app by clicking <a href="<?php echo $sageone_client->authorizationEndpoint() ?>">here</a>.
@@ -100,7 +111,7 @@ $test_url = substr( $test_url, 0, strpos( $test_url, '?' ) ) . '?page=tl-wc-sage
                     </td>
                 </tr>
 
-                <tr valign="top">
+                <tr style="vertical-align: top">
                     <th scope="row">Access Token Expires at</th>
                     <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ?>"
                                value="<?php echo esc_attr( get_option( ThinkingLogicWCSage::OPTION_ACCESS_TOKEN_EXPIRES ) ); ?>"/>
@@ -110,14 +121,14 @@ $test_url = substr( $test_url, 0, strpos( $test_url, '?' ) ) . '?page=tl-wc-sage
                     </td>
                 </tr>
 
-                <tr valign="top">
+                <tr style="vertical-align: top">
                     <th scope="row">Refresh Token</th>
                     <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_REFRESH_TOKEN ?>"
                                value="<?php echo esc_attr( get_option( ThinkingLogicWCSage::OPTION_REFRESH_TOKEN ) ); ?>"/>
                     </td>
                 </tr>
 
-                <tr valign="top">
+                <tr style="vertical-align: top">
                     <th scope="row">Refresh Token Expires at</th>
                     <td><input type="text" name="<?php echo ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES_AT ?>"
                                value="<?php echo esc_attr( get_option( ThinkingLogicWCSage::OPTION_REFRESH_TOKEN_EXPIRES_AT ) ); ?>"/>
@@ -132,19 +143,16 @@ $test_url = substr( $test_url, 0, strpos( $test_url, '?' ) ) . '?page=tl-wc-sage
 			$access_token = get_option( ThinkingLogicWCSage::OPTION_ACCESS_TOKEN );
 			if ( $access_token ) {
 				?>
-                <tr valign="top">
+                <tr style="vertical-align: top">
                     <th scope="row">Test Sage connection</th>
                     <td><a class="button" href="<?php echo $test_url ?>&test_client=true">List customers</a>
                         <a class="button" href="<?php echo $test_url ?>&test_endpoint=/contact_types">List contact
                             types</a>
                         <a class="button" href="<?php echo $test_url ?>&test_endpoint=/contact_person_types">List
                             contact person types</a>
-                        <a class="button"
-                           href="<?php echo $test_url ?>&test_endpoint=/ledger_accounts<?php echo urlencode( '?items_per_page=100&attributes=nominal_code' ) ?>">List
-                            Ledger accounts</a>
                     </td>
                 </tr>
-                <tr valign="top">
+                <tr style="vertical-align: top">
                     <th scope="row">(Advanced) get Sage data</th>
                     <td><input type="text" name="_tl_test_endpoint" id="_tl_test_endpoint"/><a class="button"
                                                                                                id="tl_test_endpoint_button"
@@ -155,13 +163,13 @@ $test_url = substr( $test_url, 0, strpos( $test_url, '?' ) ) . '?page=tl-wc-sage
                 </tr>
 			<?php } ?>
 
-            <tr valign="top">
+            <tr style="vertical-align: top">
                 <th scope="row"></th>
                 <td><?php submit_button(); ?></td>
             </tr>
 
 			<?php if ( $response ) { ?>
-                <tr valign="top">
+                <tr style="vertical-align: top">
                     <th scope="row">Response from Sage:</th>
                     <td><?php echo $test_endpoint ?><br/>
                         <pre><?php $pretty_json = json_encode( $response->getJSON(), JSON_PRETTY_PRINT );
