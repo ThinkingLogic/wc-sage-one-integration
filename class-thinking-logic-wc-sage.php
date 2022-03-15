@@ -125,7 +125,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 *
 		 * @return     boolean   true if the order is valid
 		 */
-		private function validateOrder( WC_Order $order ): bool {
+		public function validateOrder( WC_Order $order ): bool {
 			$result = true;
 			foreach ( $order->get_items() as $item ) {
 				if ( ! $this->getSalesLedgerId( $item ) ) {
@@ -525,14 +525,14 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 
 		/**
 		 * Creates an invoice in SageOne.
-		 * See also: https://developer.columbus.sage.com/docs#/uki/sageone/accounts/v3/sales_invoices_sales_invoice
+		 * See also: https://developer.sage.com/api/accounting/api/invoicing-sales/#operation/postSalesInvoices
 		 *
 		 * @param WC_Order $order The order
 		 * @param object $customer The customer as a Sage contact. https://developer.sage.com/api/accounting/api/contacts/#tag/Contacts.
-		 * @param string $invoice_date The invoice date in the format ::DATE_FORMAT
+		 * @param string $invoice_date The invoice date in the format ::SAGE_DATE_FORMAT
 		 * @param number $invoice_amount The invoice amount
 		 *
-		 * @return     object    the response from sage, as a json object. https://developer.columbus.sage.com/docs#/uki/sageone/accounts/v3/sales_invoices_sales_invoice
+		 * @return     object    the response from sage, as a json object. https://developer.sage.com/api/accounting/api/invoicing-sales/#operation/postSalesInvoices
 		 */
 		private function createInvoice( WC_Order $order, $customer, string $invoice_date, $invoice_amount ) {
 			$invoice_fraction = $this->calculateInvoiceFraction( $order, $invoice_amount );
@@ -565,7 +565,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 			$sales_invoice = apply_filters( ThinkingLogicWCSage::FILTER_INVOICE, $sales_invoice, $order );
 			Logger::log( "createInvoice: after filter: " . json_encode( $sales_invoice ) );
 
-			return $this->postData( '/sales_invoices', [ 'sales_invoice' => $sales_invoice ] )->getJSON();
+			return $this->postInvoiceToSage( $sales_invoice );
 		}
 
 		/**
@@ -586,9 +586,9 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 		 * @param WC_Order_Item $item The line item
 		 * @param float $invoice_fraction the fraction of the order value accounted for by this invoice.
 		 *
-		 * @return array the line item as defined by https://developer.columbus.sage.com/docs#/uki/sageone/accounts/v3/sales_invoices_sales_invoice_invoice_lines
+		 * @return array the line item as defined by https://developer.sage.com/api/accounting/api/invoicing-sales/#operation/postSalesInvoices
 		 */
-		private function getSalesInvoiceLineItem( WC_Order_Item $item, float $invoice_fraction ): array {
+		public function getSalesInvoiceLineItem( WC_Order_Item $item, float $invoice_fraction ): array {
 			$line_item_amount = $item->get_total() * $invoice_fraction;
 			$line_item_tax    = $item->get_total_tax() * $invoice_fraction;
 			$description      = $this->getLineItemDetail( $item );
@@ -616,14 +616,19 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 			$detail    = $item->get_name();
 			$meta_data = $item->get_meta_data();
 			foreach ( $meta_data as $meta ) {
-				// $key = $meta->key;
-				// if ((substr($key, 0, 3) === 'pa_')) {
-				//     $key = substr($key, 3);
-				// }
-				$detail .= ', ' . $meta->value; //' ' . $key . '=' . $meta->value;
+				$detail .= ', ' . $meta->value;
 			}
 
 			return $detail;
+		}
+
+		/**
+		 * @param $sales_invoice object see https://developer.sage.com/api/accounting/api/invoicing-sales/#operation/postSalesInvoices
+		 *
+		 * @return mixed the response body as parsed from json
+		 */
+		public function postInvoiceToSage( $sales_invoice ) {
+			return $this->postData( '/sales_invoices', [ 'sales_invoice' => $sales_invoice ] )->getJSON();
 		}
 
 		/**
