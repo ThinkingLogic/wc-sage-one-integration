@@ -31,7 +31,7 @@ $test_url = substr( $test_url, 0, strpos( $test_url, '?' ) ) . '?page=tl-wc-sage
 		<?php settings_fields( ThinkingLogicWCSage::OPTIONS_GROUP ); ?>
 		<?php do_settings_sections( ThinkingLogicWCSage::OPTIONS_GROUP ); ?>
 		<?php
-		if ( isset( $client ) && $sageone_client->isRefreshTokenExpiringSoon() ) {
+		if ( isset( $sageone_client ) && $sageone_client && $sageone_client->isRefreshTokenExpiringSoon() ) {
 			echo '<p><strong>Your Refresh Token expires soon - you should:<br/>';
 			echo '<a class="button" href="' . $sageone_client->authorizationEndpoint() . '">Refresh Authorisation</a>';
 			echo '</strong></p><hr/>';
