@@ -165,11 +165,17 @@ class SageApiClient {
 		} catch ( \GuzzleHttp\Exception\ClientException|\GuzzleHttp\Exception\ServerException $e ) {
 			// catch all 4xx errors
 			Logger::log( "Caught " . get_class( $e ) . " making " . $httpMethod . " request to " . $resource . ": " . $e->getMessage() );
+			if (!is_null($postData)) {
+				Logger::log("Request body: " . json_encode($postData));
+			}
 			$requestResponse = $e->getResponse();
 			Logger::addAdminWarning( $e->getMessage() );
 		} catch ( \GuzzleHttp\Exception\ConnectException|Exception $e ) {
 			// general exception
 			Logger::log( "Caught " . get_class( $e ) . " making " . $httpMethod . " request to " . $resource . ": " . $e->getMessage() );
+			if (!is_null($postData)) {
+				Logger::log("Request body: " . json_encode($postData));
+			}
 			Logger::addAdminWarning( $e->getMessage() );
 		} finally {
 			$endTime      = microtime( 1 );

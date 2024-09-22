@@ -9,8 +9,8 @@ $client         = false;
 if ( ThinkingLogicWCSage::hasClientDetails() ) {
 	$client         = ThinkingLogicWCSage::instance();
 	$sageone_client = ThinkingLogicWCSage::sageClient();
-	$test_client    = $_GET['test_client'];
-	$test_endpoint  = $_GET['test_endpoint'];
+	$test_client    = $_GET['test_client'] ?? false;
+	$test_endpoint  = $_GET['test_endpoint'] ?? false;
 	if ( $test_client ) {
 		$response = $client->listCustomers();
 	} elseif ( $test_endpoint ) {

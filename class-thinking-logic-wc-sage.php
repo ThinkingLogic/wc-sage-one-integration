@@ -618,7 +618,7 @@ if ( ! class_exists( 'ThinkingLogicWCSage' ) ) {
 			foreach ( $meta_data as $meta ) {
 				$detail .= ', ' . $meta->value;
 			}
-
+			$detail = preg_replace("/&#?[a-z0-9]+;/i","",$detail);
 			return $detail;
 		}
 
