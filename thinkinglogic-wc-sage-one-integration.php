@@ -1,15 +1,19 @@
 <?php
 /*
- * Plugin Name:       ThinkingLogic WooCommerce / Sage One Integration
- * Plugin URI:        https://github.com/ThinkingLogic/wc-sage-one-integration
- * Description:       An integration with the Sage One api (v3.1) for WooCommerce - allowing orders to be turned into Sage One invoices at the click of a button (per order). One invoice will be created per order per month. Each invoice will be allocated a fraction of the total cost of the order, according to how many lessons occur in that month.
- * Version:           0.2
- * Text Domain:       tl-wc-sage-one-integration
- * Author:            Thinking Logic
- * Author URI:        https://github.com/ThinkingLogic/wc-sage-one-integration
- * License:           MIT
- * License URI:       http://www.opensource.org/licenses/MIT
- * Domain Path:       /languages
+ * Plugin Name:				ThinkingLogic WooCommerce / Sage One Integration
+ * Plugin URI:				http:/github.com/ThinkingLogic/wc-sage-one-integration
+ * Description:				An integration with the Sage One api (v3.1) for WooCommerce - allowing orders to be turned into Sage One invoices at the click of a button (per order). One invoice will be created per order per month. Each invoice will be allocated a fraction of the total cost of the order, according to how many lessons occur in that month.
+ * Version:					0.2
+ * Requires at least:		4.4
+ * Tested up to:			5.4
+ * WC requires at least:	3.0
+ * WC tested up to:			4.3
+ * Text Domain:				tl-wc-sage-one-integration
+ * Author:					Thinking Logic
+ * Author URI:				https://github.com/ThinkingLogic/wc-sage-one-integration
+ * License:					MIT
+ * License URI:				http://www.opensource.org/licenses/MIT
+ * Domain Path:				/languages
  */
 
 use ThinkingLogic\Logger;
